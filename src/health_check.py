@@ -1,5 +1,6 @@
 import requests
 
+
 class HealthCheck:
     def __init__(self, vts_port, wws_port):
         self.vts_url = f"http://localhost:{vts_port}/health"
@@ -19,7 +20,6 @@ class HealthCheck:
         except requests.Timeout:
             print(f"Service at {url} is down.")
             return False
-
 
     def check_services(self):
         self.vts_status = self._check_service(self.vts_url)
