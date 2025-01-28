@@ -1,14 +1,8 @@
-import requests
+from src.health_check import HealthCheck
 
-FASTAPI_URL = "http://localhost:8000"
+VISION_TRACKING_SERVICE_PORT = 8000
+WINDOWS_WEBCAM_SERVICE_PORT = 8001
 
-try:
-    response = requests.get(FASTAPI_URL, timeout=5)
-    if response.status_code == 200:
-        print("✅ Connected to FastAPI server successfully!")
-    else:
-        print(f"⚠️ FastAPI server responded with status code: {response.status_code}")
-except requests.ConnectionError:
-    print("❌ Could not connect to FastAPI server. Is it running?")
-except requests.Timeout:
-    print("⏳ Request timed out. Server might be unresponsive.")
+if __name__ == "__main__":
+    health_check = HealthCheck(VISION_TRACKING_SERVICE_PORT, WINDOWS_WEBCAM_SERVICE_PORT)
+    health_check.check_services()
