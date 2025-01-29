@@ -2,9 +2,9 @@ import requests
 
 
 class HealthCheck:
-    def __init__(self, vts_port, wws_port):
-        self.vts_url = f"http://localhost:{vts_port}/health"
-        self.wws_url = f"http://localhost:{wws_port}/health"
+    def __init__(self, vts_ip, vts_port, wws_ip, wws_port):
+        self.vts_url = f"http://{vts_ip}:{vts_port}/health"
+        self.wws_url = f"http://{wws_ip}:{wws_port}/health"
 
         self.vts_status = False
         self.wws_status = False
