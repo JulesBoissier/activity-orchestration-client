@@ -1,4 +1,5 @@
 from abc import ABC
+from io import BytesIO
 
 import cv2
 import numpy as np
@@ -77,8 +78,6 @@ class VisionTrackingClient(ServiceClient):
         return response.status_code
 
     def add_calibration_point(self, x, y, image):
-        from io import BytesIO
-
         url = self.root_url + "/cal_point"
 
         # Convert NumPy array to JPEG bytes
@@ -94,8 +93,20 @@ class VisionTrackingClient(ServiceClient):
 
         return response.status_code
 
-    def predict_por(image):
-        pass
+    def predict_por(self, image):
+        url = self.root_url + "/predict"
+
+        # Convert NumPy array to JPEG bytes
+        _, img_encoded = cv2.imencode(".jpg", image)
+        image_bytes = BytesIO(img_encoded.tobytes())  # Create file-like object
+
+        # Prepare form data and files
+        files = {"file": ("image.jpg", image_bytes, "image/jpeg")}  # File upload
+
+        # Send POST request
+        response = requests.post(url, files=files)
+
+        return response.json()
 
 
 class FocusAreaWorker:
@@ -117,19 +128,12 @@ class FocusAreaWorker:
         self.resolution = resolution
 
     def _load_vts_profile(self):
-        url = self.vts_url + "/load_profile"
-        params = {"profile_id": self.vts_profile_id}
-        requests.post(url, params=params)
+        self.vts_client.load_profile(self.vts_profile_id)
 
-    def obtain_point_of_regard(self, image):
-        url = self.vts_url + "/predict"
-
-        # Define the file to upload
-        file_path = "image.jpg"  # Replace with actual file path
-        files = {"file": open(file_path, "rb")}  # Open file in binary mode
-
-        # Send the request
-        response = requests.post(url, files=files)
+    def obtain_point_of_regard(self):
+        image = self.wws_client.get_camera_input()
+        predictions = self.vts_client.predict_por(image=image)
+        return predictions
 
     def focus_area(self, point_of_regard):
         pass
