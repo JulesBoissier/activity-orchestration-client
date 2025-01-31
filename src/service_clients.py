@@ -106,4 +106,4 @@ class VisionTrackingClient(ServiceClient):
         # Send POST request
         response = requests.post(url, files=files)
 
-        return response.json()
+        return response.json()["prediction"]

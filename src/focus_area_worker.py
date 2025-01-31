@@ -19,8 +19,8 @@ class FocusAreaWorker:
 
     def predict_point_of_regard(self):
         image = self.wws_client.get_camera_input()
-        predictions = self.vts_client.predict_por(image=image)
-        return predictions
+        prediction = self.vts_client.predict_por(image=image)
+        return prediction[0], prediction[1]  # Returns x, y coordinates
 
     def get_focus_region(self, x, y):
         for region in self.screen_region_list:
