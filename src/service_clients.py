@@ -4,7 +4,6 @@ from io import BytesIO
 import cv2
 import numpy as np
 import requests
-from screeninfo import get_monitors
 
 
 class ServiceClient(ABC):
@@ -108,44 +107,3 @@ class VisionTrackingClient(ServiceClient):
         response = requests.post(url, files=files)
 
         return response.json()
-
-
-class FocusAreaWorker:
-    def __init__(
-        self,
-        wws_client: WindowsWebcamClient,
-        vts_client: VisionTrackingClient,
-        resolution: int,
-    ):
-        # Dependency injection. FAW doesn't need to need to know about API implementations.
-        self.vts_client = vts_client
-        self.wws_client = wws_client
-
-        self.resolution = resolution
-
-    def obtain_point_of_regard(self):
-        image = self.wws_client.get_camera_input()
-        predictions = self.vts_client.predict_por(image=image)
-        return predictions
-
-    def _get_screen_area_dimensions(self):
-        monitor = get_monitors()[0]
-
-        section_width = monitor.width / self.resolution
-        section_height = monitor.height / self.resolution
-
-        screen_areas = []
-
-        # TODO: To clean up and start from 0, 0 instead of 1, 1.
-        for i in range(self.resolution):
-            for j in range(self.resolution):
-                x = section_width * i
-                y = section_height * j
-                screen_areas.append(
-                    (x + 1, y + 1, x + section_width, y + section_height)
-                )
-
-        return screen_areas
-
-    def focus_area(self, point_of_regard):
-        pass
