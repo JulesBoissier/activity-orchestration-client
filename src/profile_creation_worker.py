@@ -21,7 +21,21 @@ class ProfileCreationUnit:
         self.wwc = wwc
         self.vtc = vtc
         self.images = []
+        self.show_start_message()
+
         self.root.mainloop()  # Run main event loop inside the class
+
+    def show_start_message(self):
+        """Displays a text box with instructions."""
+        self.canvas.delete("all")
+        self.canvas.create_text(
+            self.root.winfo_screenwidth() // 2,
+            self.root.winfo_screenheight() // 2,
+            text="Follow the white circle with your gaze and pres ENTER to lock-in a calibration point. \nPress BACKSPACE to go back. \nPress ENTER to start.",
+            fill="white",
+            font=("Arial", 24, "bold"),
+            justify="center",
+        )
 
     def draw_element(self):
         """Draws the shape at the current position."""
