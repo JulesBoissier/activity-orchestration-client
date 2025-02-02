@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from src.focus_area_worker import FocusAreaWorker
 from src.profile_creation_worker import ProfileCreationUnit
-from src.screen_region import create_screen_region_list
+from src.screen_region import MonitorUtility
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 load_dotenv()
@@ -27,7 +27,8 @@ class ApplicationLifecycle:
         )
 
         # Create screen regions
-        self.regions = create_screen_region_list(2)
+        self.monitor = MonitorUtility.select_monitor(2)
+        self.regions = MonitorUtility.create_screen_region_list(self.monitor, 2)
         self.faw = FocusAreaWorker(self.wwc, self.vtc, self.regions)
 
         self.now = datetime.now()
@@ -51,18 +52,9 @@ class ApplicationLifecycle:
 
     def create_new_profile(self):
         """Handles new profile creation with calibration."""
-        positions = [
-            (0, 0),
-            (960, 0),
-            (1920, 0),
-            (0, 540),
-            (960, 540),
-            (1920, 540),
-            (0, 1080),
-            (960, 1080),
-            (1920, 1080),
-        ]  # TODO: Make this dynamic with from screeninfo import get_monitors
-        ProfileCreationUnit(positions, self.wwc, self.vtc)
+
+        positions = MonitorUtility.create_positions_list(self.monitor, 3)
+        ProfileCreationUnit(self.monitor, positions, self.wwc, self.vtc)
         input("Profile creation complete. Press Enter to continue...")
 
     def monitor_focus(self):

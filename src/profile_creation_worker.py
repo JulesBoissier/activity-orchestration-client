@@ -1,12 +1,26 @@
 import tkinter as tk
 from tkinter import messagebox
+from typing import List, Tuple
 
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 
 class ProfileCreationUnit:
-    def __init__(self, positions, wwc: WindowsWebcamClient, vtc: VisionTrackingClient):
+    def __init__(
+        self,
+        monitor,
+        positions: List[Tuple[int, int]],
+        wwc: WindowsWebcamClient,
+        vtc: VisionTrackingClient,
+    ):
         self.root = tk.Tk()
+
+        self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}")
+
+        # self.root.geometry(f"1920x1080+0+0")
+        self.root.update()
+
+        # Apply fullscreen mode
         self.root.attributes("-fullscreen", True)
         self.root.configure(bg="black")
         self.root.bind("<Escape>", self.exit_app)
