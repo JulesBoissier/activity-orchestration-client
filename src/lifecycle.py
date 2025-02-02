@@ -12,7 +12,7 @@ load_dotenv()
 
 
 class ApplicationLifecycle:
-    def __init__(self, period: int = 2):
+    def __init__(self, monitor_index: int = 1, period: int = 2):
         """Initialize the application lifecycle with a given period (seconds)."""
         self.period = period
 
@@ -27,7 +27,7 @@ class ApplicationLifecycle:
         )
 
         # Create screen regions
-        self.monitor = MonitorUtility.select_monitor(2)
+        self.monitor = MonitorUtility.select_monitor(monitor_index)
         self.regions = MonitorUtility.create_screen_region_list(self.monitor, 2)
         self.faw = FocusAreaWorker(self.wwc, self.vtc, self.regions)
 
