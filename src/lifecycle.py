@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
+from tabulate import tabulate
 
 from src.focus_area_worker import FocusAreaWorker
 from src.profile_creation_worker import ProfileCreationUnit
@@ -40,15 +41,39 @@ class ApplicationLifecycle:
                 "Service connection error: VisionTrackingClient or WindowsWebcamClient is unavailable."
             )
 
+    def _display_profiles(self):
+        profiles = self.vtc.list_profiles()["profiles"]
+
+        if not profiles:
+            print("No profiles found.")
+            return None
+
+        # Convert profiles into a table format
+        table = [
+            [profile["id"], profile["profile_name"], profile["updated_at"]]
+            for profile in profiles
+        ]
+        print(
+            tabulate(
+                table, headers=["ID", "Profile Name", "Last Updated"], tablefmt="grid"
+            )
+        )
+
+        return profiles  # Return the list for further use if needed
+
     def select_or_create_profile(self):
         """Prompt user to select an existing profile or create a new one."""
-        profile_id = input(
-            f"Select a profile from one of {self.vtc.list_profiles()}, or choose 0 to create a new profile: \n"
+
+        print(
+            "Select a Profile ID from the following, or press enter to create a new profile:"
         )
-        if int(profile_id):  #! Bit ugly hack
-            self.vtc.load_profile(profile_id)
-        else:
+        self._display_profiles()
+        profile_id = input()
+
+        if profile_id == "0" or not profile_id:
             self.create_new_profile()
+        else:
+            self.vtc.load_profile(profile_id)
 
     def create_new_profile(self):
         """Handles new profile creation with calibration."""
