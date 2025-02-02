@@ -60,19 +60,10 @@ class MonitorUtility:
         step_x = monitor.width // (resolution - 1)  # X spacing
         step_y = monitor.height // (resolution - 1)  # Y spacing
 
-        print("Creating position list")
-        print(monitor.width, monitor.height)
-        print(step_x, step_y)
-
         # Generate NxN grid of points
-        # positions = [(monitor.x + step_x * col, monitor.y + step_y * row)
-        #             for row in range(resolution) for col in range(resolution)]
         positions = [
             (monitor.x + step_x * col, monitor.y + step_y * row)
             for row in range(resolution)
             for col in range(resolution)
         ]
-        print(monitor.x)
-        print(monitor.y)
-        print(positions)
         return positions
