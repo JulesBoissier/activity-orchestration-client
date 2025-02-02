@@ -1,12 +1,24 @@
 import tkinter as tk
 from tkinter import messagebox
+from typing import List, Tuple
 
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 
 class ProfileCreationUnit:
-    def __init__(self, positions, wwc: WindowsWebcamClient, vtc: VisionTrackingClient):
+    def __init__(
+        self,
+        monitor,
+        positions: List[Tuple[int, int]],
+        wwc: WindowsWebcamClient,
+        vtc: VisionTrackingClient,
+    ):
         self.root = tk.Tk()
+
+        self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}")
+        self.root.update()
+
+        # Apply fullscreen mode
         self.root.attributes("-fullscreen", True)
         self.root.configure(bg="black")
         self.root.bind("<Escape>", self.exit_app)
@@ -14,7 +26,7 @@ class ProfileCreationUnit:
         self.root.bind("<BackSpace>", self.prev_position)
 
         self.positions = positions
-        self.index = -1
+        self.started_calibration = False
         self.canvas = tk.Canvas(self.root, bg="black", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
@@ -38,18 +50,32 @@ class ProfileCreationUnit:
         )
 
     def draw_element(self):
-        """Draws the shape at the current position."""
+        """Draws the shape at the current position, adjusting for monitor position."""
         self.canvas.delete("all")  # Clear previous elements
         x, y = self.positions[self.index]
 
-        self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="white", outline="")
+        # Convert from global screen space to Tkinter's local window space
+        local_x = x - self.root.winfo_x()
+        local_y = y - self.root.winfo_y()
+
+        self.canvas.create_oval(
+            local_x - 5, local_y - 5, local_x + 5, local_y + 5, fill="white", outline=""
+        )
 
     def next_position(self, event=None):
         """Move to the next position."""
-        if self.index < len(self.positions) - 1:
-            image = self.wwc.get_camera_input()  # Capture an image of the face
-            self.images.append(image)
+        if not self.started_calibration:  # This gets passed the initial message.
+            self.started_calibration = True
+            self.index = 0
+            self.draw_element()
+            return
 
+        image = self.wwc.get_camera_input()  # Capture an image of the face
+        self.images.append(image)
+
+        if (
+            self.index < len(self.positions) - 1
+        ):  # While there are positions left, move to next
             self.index += 1
             self.draw_element()
         else:
@@ -68,7 +94,6 @@ class ProfileCreationUnit:
         """Simulate sending data at the end."""
 
         for position, image in zip(self.positions, self.images):
-            print(f"Adding an image to cal_points")
             self.vtc.add_calibration_point(position[0], position[1], image)
 
         messagebox.showinfo("Info", "Data Sent Successfully!")
