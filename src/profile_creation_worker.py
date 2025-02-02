@@ -95,6 +95,7 @@ class ProfileCreationUnit:
 
         for position, image in zip(self.positions, self.images):
             print(f"Adding an image to cal_points")
+            print(image)
             self.vtc.add_calibration_point(position[0], position[1], image)
 
         messagebox.showinfo("Info", "Data Sent Successfully!")

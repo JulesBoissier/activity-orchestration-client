@@ -38,15 +38,18 @@ class MonitorUtility:
 
     @staticmethod
     def create_screen_region_list(monitor, resolution: int):
+        """Creates a list of screen regions with correct global offsets, matching position coordinates."""
         section_width = monitor.width / resolution
         section_height = monitor.height / resolution
 
         screen_region_list = [
             ScreenRegion(
-                int(section_width * i),
-                int(section_width * (i + 1)),
-                int(section_height * j),
-                int(section_height * (j + 1)),
+                int(monitor.x + section_width * i),  # Adjust min_x with monitor.x
+                int(monitor.x + section_width * (i + 1)),  # Adjust max_x with monitor.x
+                int(monitor.y + section_height * j),  # Adjust min_y with monitor.y
+                int(
+                    monitor.y + section_height * (j + 1)
+                ),  # Adjust max_y with monitor.y
             )
             for j in range(resolution)
             for i in range(resolution)
