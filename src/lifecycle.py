@@ -8,6 +8,8 @@ from src.profile_creation_worker import ProfileCreationUnit
 from src.screen_region import create_screen_region_list
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
+load_dotenv()
+
 
 class ApplicationLifecycle:
     def __init__(self, period: int = 2):

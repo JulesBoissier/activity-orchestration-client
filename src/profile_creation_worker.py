@@ -14,7 +14,7 @@ class ProfileCreationUnit:
         self.root.bind("<BackSpace>", self.prev_position)
 
         self.positions = positions
-        self.index = -1
+        self.started_calibration = False
         self.canvas = tk.Canvas(self.root, bg="black", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
@@ -46,10 +46,18 @@ class ProfileCreationUnit:
 
     def next_position(self, event=None):
         """Move to the next position."""
-        if self.index < len(self.positions) - 1:
-            image = self.wwc.get_camera_input()  # Capture an image of the face
-            self.images.append(image)
+        if not self.started_calibration:  # This gets passed the initial message.
+            self.started_calibration = True
+            self.index = 0
+            self.draw_element()
+            return
 
+        image = self.wwc.get_camera_input()  # Capture an image of the face
+        self.images.append(image)
+
+        if (
+            self.index < len(self.positions) - 1
+        ):  # While there are positions left, move to next
             self.index += 1
             self.draw_element()
         else:
