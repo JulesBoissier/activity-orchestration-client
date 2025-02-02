@@ -12,9 +12,13 @@ class ScreenRegion:
     max_y: int
 
     def is_point_in_region(self, x, y):
-        if self.min_x <= x < self.max_x and self.min_y <= y < self.max_y:
-            return True
-        return False
+        try:
+            if self.min_x <= x < self.max_x and self.min_y <= y < self.max_y:
+                return True
+            return False
+        except TypeError:
+            print("Invalid coordinates provided.")
+            return False
 
 
 class MonitorUtility:
