@@ -17,21 +17,56 @@ class ScreenRegion:
         return False
 
 
-def create_screen_region_list(resolution) -> List[ScreenRegion]:
-    monitor = get_monitors()[0]
+class MonitorUtility:
+    @staticmethod
+    def select_monitor(display_index):
+        """Select a monitor based on index (1 for primary, 2 for secondary, etc.)"""
 
-    section_width = monitor.width / resolution
-    section_height = monitor.height / resolution
+        monitors = get_monitors()
+        num_displays = len(monitors)
 
-    screen_regions = []
+        if display_index < 1 or display_index > num_displays:
+            print(
+                f"Invalid display index: {display_index}. Defaulting to primary display."
+            )
+            display_index = (
+                1  # Default to the primary display if the index is out of range
+            )
 
-    for i in range(resolution):
-        for j in range(resolution):
-            min_x = int(section_width * i)
-            min_y = int(section_height * j)
-            max_x = int(section_width * (i + 1))
-            max_y = int(section_height * (j + 1))
+        monitor = monitors[display_index - 1]  # Adjust index
+        return monitor
 
-            screen_regions.append(ScreenRegion(min_x, max_x, min_y, max_y))
+    @staticmethod
+    def create_screen_region_list(monitor, resolution: int):
+        """Creates a list of screen regions with correct global offsets, matching position coordinates."""
+        section_width = monitor.width / resolution
+        section_height = monitor.height / resolution
 
-    return screen_regions
+        screen_region_list = [
+            ScreenRegion(
+                int(monitor.x + section_width * i),  # Adjust min_x with monitor.x
+                int(monitor.x + section_width * (i + 1)),  # Adjust max_x with monitor.x
+                int(monitor.y + section_height * j),  # Adjust min_y with monitor.y
+                int(
+                    monitor.y + section_height * (j + 1)
+                ),  # Adjust max_y with monitor.y
+            )
+            for j in range(resolution)
+            for i in range(resolution)
+        ]
+
+        return screen_region_list
+
+    @staticmethod
+    def create_positions_list(monitor, resolution: int):
+        # Define NxN grid spacing
+        step_x = monitor.width // (resolution - 1)  # X spacing
+        step_y = monitor.height // (resolution - 1)  # Y spacing
+
+        # Generate NxN grid of points
+        positions = [
+            (monitor.x + step_x * col, monitor.y + step_y * row)
+            for row in range(resolution)
+            for col in range(resolution)
+        ]
+        return positions

@@ -1,12 +1,24 @@
 import tkinter as tk
 from tkinter import messagebox
+from typing import List, Tuple
 
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 
 class ProfileCreationUnit:
-    def __init__(self, positions, wwc: WindowsWebcamClient, vtc: VisionTrackingClient):
+    def __init__(
+        self,
+        monitor,
+        positions: List[Tuple[int, int]],
+        wwc: WindowsWebcamClient,
+        vtc: VisionTrackingClient,
+    ):
         self.root = tk.Tk()
+
+        self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}")
+        self.root.update()
+
+        # Apply fullscreen mode
         self.root.attributes("-fullscreen", True)
         self.root.configure(bg="black")
         self.root.bind("<Escape>", self.exit_app)
@@ -38,11 +50,17 @@ class ProfileCreationUnit:
         )
 
     def draw_element(self):
-        """Draws the shape at the current position."""
+        """Draws the shape at the current position, adjusting for monitor position."""
         self.canvas.delete("all")  # Clear previous elements
         x, y = self.positions[self.index]
 
-        self.canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="white", outline="")
+        # Convert from global screen space to Tkinter's local window space
+        local_x = x - self.root.winfo_x()
+        local_y = y - self.root.winfo_y()
+
+        self.canvas.create_oval(
+            local_x - 5, local_y - 5, local_x + 5, local_y + 5, fill="white", outline=""
+        )
 
     def next_position(self, event=None):
         """Move to the next position."""
@@ -77,6 +95,7 @@ class ProfileCreationUnit:
 
         for position, image in zip(self.positions, self.images):
             print(f"Adding an image to cal_points")
+            print(image)
             self.vtc.add_calibration_point(position[0], position[1], image)
 
         messagebox.showinfo("Info", "Data Sent Successfully!")
