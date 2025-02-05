@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 from tabulate import tabulate
 
 from src.focus_area_worker import FocusAreaWorker
-from src.profile_creation_worker import ProfileCreationGUI
 from src.screen_region import MonitorUtility
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
+from src.user_interfaces.profile_creation import ProfileCreationGUI
 
 load_dotenv()
 
