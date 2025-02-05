@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from tabulate import tabulate
 
 from src.focus_area_worker import FocusAreaWorker
-from src.profile_creation_worker import ProfileCreationUnit
+from src.profile_creation_worker import ProfileCreationGUI
 from src.screen_region import MonitorUtility
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
@@ -79,7 +79,7 @@ class ApplicationLifecycle:
         """Handles new profile creation with calibration."""
 
         positions = MonitorUtility.create_positions_list(self.monitor, 3)
-        ProfileCreationUnit(self.monitor, positions, self.wwc, self.vtc)
+        ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
         input("Profile creation complete. Press Enter to continue...")
 
     def monitor_focus(self):

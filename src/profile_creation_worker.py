@@ -5,7 +5,7 @@ from typing import List, Tuple
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 
-class ProfileCreationUnit:
+class ProfileCreationGUI:
     def __init__(
         self,
         monitor,
@@ -13,6 +13,14 @@ class ProfileCreationUnit:
         wwc: WindowsWebcamClient,
         vtc: VisionTrackingClient,
     ):
+        self.positions = positions
+        self.started_calibration = False
+        self.wwc = wwc
+        self.vtc = vtc
+        self.images = []
+        self.start_tk(monitor=monitor)
+
+    def start_tk(self, monitor):
         self.root = tk.Tk()
 
         self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}")
@@ -25,16 +33,9 @@ class ProfileCreationUnit:
         self.root.bind("<Return>", self.next_position)
         self.root.bind("<BackSpace>", self.prev_position)
 
-        self.positions = positions
-        self.started_calibration = False
         self.canvas = tk.Canvas(self.root, bg="black", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
-
-        self.wwc = wwc
-        self.vtc = vtc
-        self.images = []
         self.show_start_message()
-
         self.root.mainloop()  # Run main event loop inside the class
 
     def show_start_message(self):
