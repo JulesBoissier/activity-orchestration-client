@@ -1,13 +1,13 @@
-import tkinter as tk
 from tkinter import messagebox
 from typing import List, Tuple
 
 from screeninfo import Monitor
 
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
+from src.user_interfaces.gui_base_class import BaseGUITest
 
 
-class ProfileCreationGUI:
+class ProfileCreationGUI(BaseGUITest):
     def __init__(
         self,
         monitor: Monitor,
@@ -15,72 +15,32 @@ class ProfileCreationGUI:
         wwc: WindowsWebcamClient,
         vtc: VisionTrackingClient,
     ):
-        self.monitor = monitor
+        super().__init__(monitor, wwc, vtc)
         self.positions = positions
-        self.started_calibration = False
-        self.wwc = wwc
-        self.vtc = vtc
         self.images = []
 
-    def run(self):
-        self.root = tk.Tk()
-
-        self.root.geometry(
-            f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}"
-        )
-        self.root.update()
-
-        # Apply fullscreen mode
-        self.root.attributes("-fullscreen", True)
-        self.root.configure(bg="black")
-        self.root.bind("<Escape>", self.exit_app)
-        self.root.bind("<Return>", self.next_position)
-        self.root.bind("<BackSpace>", self.prev_position)
-
-        self.canvas = tk.Canvas(self.root, bg="black", highlightthickness=0)
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-        self.show_start_message()
-        self.root.mainloop()  # Run main event loop inside the class
-
     def show_start_message(self):
-        """Displays a text box with instructions."""
         self.canvas.delete("all")
         self.canvas.create_text(
             self.root.winfo_screenwidth() // 2,
             self.root.winfo_screenheight() // 2,
-            text="Follow the white circle with your gaze and pres ENTER to lock-in a calibration point. \nPress BACKSPACE to go back. \nPress ENTER to start.",
+            text="Follow the white circle with your gaze and press ENTER to lock-in a calibration point.\nPress BACKSPACE to go back.\nPress ENTER to start.",
             fill="white",
             font=("Arial", 24, "bold"),
             justify="center",
         )
 
-    def draw_element(self):
-        """Draws the shape at the current position, adjusting for monitor position."""
-        self.canvas.delete("all")  # Clear previous elements
-        x, y = self.positions[self.index]
-
-        # Convert from global screen space to Tkinter's local window space
-        local_x = x - self.root.winfo_x()
-        local_y = y - self.root.winfo_y()
-
-        self.canvas.create_oval(
-            local_x - 5, local_y - 5, local_x + 5, local_y + 5, fill="white", outline=""
-        )
-
     def next_position(self, event=None):
-        """Move to the next position."""
-        if not self.started_calibration:  # This gets passed the initial message.
+        if not self.started_calibration:
             self.started_calibration = True
             self.index = 0
             self.draw_element()
             return
 
-        image = self.wwc.get_camera_input()  # Capture an image of the face
+        image = self.wwc.get_camera_input()
         self.images.append(image)
 
-        if (
-            self.index < len(self.positions) - 1
-        ):  # While there are positions left, move to next
+        if self.index < len(self.positions) - 1:
             self.index += 1
             self.draw_element()
         else:
@@ -88,21 +48,12 @@ class ProfileCreationGUI:
             self.exit_app()
 
     def prev_position(self, event=None):
-        """Move back to the previous position."""
         if self.index > 0:
-            self.images.pop(-1)  # Removes the last image from the list.
-
+            self.images.pop(-1)
             self.index -= 1
             self.draw_element()
 
     def send_data(self):
-        """Simulate sending data at the end."""
-
         for position, image in zip(self.positions, self.images):
             self.vtc.add_calibration_point(position[0], position[1], image)
-
         messagebox.showinfo("Info", "Data Sent Successfully!")
-
-    def exit_app(self, event=None):
-        """Exit the application."""
-        self.root.destroy()
