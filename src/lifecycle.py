@@ -80,7 +80,8 @@ class ApplicationLifecycle:
         """Handles new profile creation with calibration."""
 
         positions = MonitorUtility.create_positions_list(self.monitor, 3)
-        ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
+        pcg = ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
+        pcg.run()
 
     def run_performance_analysis(self):
         choice = input("Run performance analysis? [Y/N]: ")
@@ -94,7 +95,8 @@ class ApplicationLifecycle:
             self.run_performance_analysis()
 
     def _performance_analysis(self):
-        PerformanceMonitoringGUI(self.monitor, 5, self.wwc, self.vtc)
+        pmg = PerformanceMonitoringGUI(self.monitor, 5, self.wwc, self.vtc)
+        pmg.run()
 
     def monitor_focus(self):
         """Main loop to track and process user focus region."""

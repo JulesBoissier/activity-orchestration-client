@@ -13,17 +13,19 @@ class ProfileCreationGUI:
         wwc: WindowsWebcamClient,
         vtc: VisionTrackingClient,
     ):
+        self.monitor = monitor
         self.positions = positions
         self.started_calibration = False
         self.wwc = wwc
         self.vtc = vtc
         self.images = []
-        self.start_tk(monitor=monitor)
 
-    def start_tk(self, monitor):
+    def run(self):
         self.root = tk.Tk()
 
-        self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}")
+        self.root.geometry(
+            f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}"
+        )
         self.root.update()
 
         # Apply fullscreen mode

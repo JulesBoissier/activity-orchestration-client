@@ -14,7 +14,7 @@ class PerformanceMonitoringGUI:
         wwc: WindowsWebcamClient,
         vtc: VisionTrackingClient,
     ):
-        self.started_calibration = False
+        self.monitor = monitor
         self.wwc = wwc
         self.vtc = vtc
         self.positions = [
@@ -22,12 +22,14 @@ class PerformanceMonitoringGUI:
             for _ in range(nbr_of_points)
         ]
         self.predictions = []
-        self.start_tk(monitor=monitor)
+        self.started_calibration = False
 
-    def start_tk(self, monitor):
+    def run(self):
         self.root = tk.Tk()
 
-        self.root.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}")
+        self.root.geometry(
+            f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}"
+        )
         self.root.update()
 
         # Apply fullscreen mode
