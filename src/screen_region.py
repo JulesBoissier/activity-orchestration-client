@@ -69,7 +69,7 @@ class MonitorUtility:
 
         # Generate NxN grid of points
         positions = [
-            (monitor.x + step_x * col, monitor.y + step_y * row)
+            (step_x * col, step_y * row)
             for row in range(resolution)
             for col in range(resolution)
         ]
