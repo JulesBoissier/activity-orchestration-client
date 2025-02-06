@@ -3,13 +3,15 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import List, Tuple
 
+from screeninfo import Monitor
+
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 
 class PerformanceMonitoringGUI:
     def __init__(
         self,
-        monitor,
+        monitor: Monitor,
         nbr_of_points: int,
         wwc: WindowsWebcamClient,
         vtc: VisionTrackingClient,

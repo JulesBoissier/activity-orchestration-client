@@ -2,13 +2,15 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import List, Tuple
 
+from screeninfo import Monitor
+
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 
 class ProfileCreationGUI:
     def __init__(
         self,
-        monitor,
+        monitor: Monitor,
         positions: List[Tuple[int, int]],
         wwc: WindowsWebcamClient,
         vtc: VisionTrackingClient,
