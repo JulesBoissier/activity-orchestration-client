@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
-from screeninfo import get_monitors
+from screeninfo import Monitor, get_monitors
 
 
 @dataclass
@@ -23,7 +23,7 @@ class ScreenRegion:
 
 class MonitorUtility:
     @staticmethod
-    def select_monitor(display_index):
+    def select_monitor(display_index) -> Monitor:
         """Select a monitor based on index (1 for primary, 2 for secondary, etc.)"""
 
         monitors = get_monitors()
