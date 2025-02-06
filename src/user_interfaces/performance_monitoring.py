@@ -1,5 +1,6 @@
 from tkinter import messagebox
 
+import numpy as np
 from screeninfo import Monitor
 
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
@@ -59,4 +60,11 @@ class PerformanceMonitoringGUI(BaseGUITest):
             self.draw_element()
 
     def report_results(self):
-        messagebox.showinfo("Info", "Performance monitoring complete!")
+        if len(self.predictions) == len(self.positions):
+            errors = np.array(self.predictions) - np.array(self.positions)
+            rmse = np.sqrt(np.mean(errors**2))
+            messagebox.showinfo(
+                "Info", f"Performance monitoring complete! RMSE: {rmse:.2f}"
+            )
+        else:
+            messagebox.showinfo("Info", "Performance monitoring complete!")
