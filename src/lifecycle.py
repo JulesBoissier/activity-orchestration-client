@@ -5,9 +5,10 @@ from dotenv import load_dotenv
 from tabulate import tabulate
 
 from src.focus_area_worker import FocusAreaWorker
-from src.profile_creation_worker import ProfileCreationUnit
 from src.screen_region import MonitorUtility
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
+from src.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
+from src.user_interfaces.profile_creation import ProfileCreationGUI
 
 load_dotenv()
 
@@ -79,8 +80,23 @@ class ApplicationLifecycle:
         """Handles new profile creation with calibration."""
 
         positions = MonitorUtility.create_positions_list(self.monitor, 3)
-        ProfileCreationUnit(self.monitor, positions, self.wwc, self.vtc)
-        input("Profile creation complete. Press Enter to continue...")
+        pcg = ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
+        pcg.run()
+
+    def run_performance_analysis(self):
+        choice = input("Run performance analysis? [Y/N]: ")
+
+        if choice.lower() == "y":
+            self._performance_analysis()
+        elif choice.lower() == "n":
+            return
+        else:
+            print("Invalid input. Please enter 'Y' or 'N'.")
+            self.run_performance_analysis()
+
+    def _performance_analysis(self):
+        pmg = PerformanceMonitoringGUI(self.monitor, 5, self.wwc, self.vtc)
+        pmg.run()
 
     def monitor_focus(self):
         """Main loop to track and process user focus region."""
@@ -103,6 +119,7 @@ class ApplicationLifecycle:
         """Start the application lifecycle."""
         self.check_services()
         self.select_or_create_profile()
+        self.run_performance_analysis()
         self.monitor_focus()
 
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
-from screeninfo import get_monitors
+from screeninfo import Monitor, get_monitors
 
 
 @dataclass
@@ -23,7 +23,7 @@ class ScreenRegion:
 
 class MonitorUtility:
     @staticmethod
-    def select_monitor(display_index):
+    def select_monitor(display_index) -> Monitor:
         """Select a monitor based on index (1 for primary, 2 for secondary, etc.)"""
 
         monitors = get_monitors()
@@ -42,24 +42,29 @@ class MonitorUtility:
 
     @staticmethod
     def create_screen_region_list(monitor, resolution: int):
-        """Creates a list of screen regions with correct global offsets, matching position coordinates."""
+        """Creates a list of screen regions with correct local offsets, matching position coordinates."""
         section_width = monitor.width / resolution
         section_height = monitor.height / resolution
 
         screen_region_list = [
             ScreenRegion(
-                int(monitor.x + section_width * i),  # Adjust min_x with monitor.x
-                int(monitor.x + section_width * (i + 1)),  # Adjust max_x with monitor.x
-                int(monitor.y + section_height * j),  # Adjust min_y with monitor.y
-                int(
-                    monitor.y + section_height * (j + 1)
-                ),  # Adjust max_y with monitor.y
+                int(section_width * i),  # Adjust min_x with monitor.x
+                int(section_width * (i + 1)),  # Adjust max_x with monitor.x
+                int(section_height * j),  # Adjust min_y with monitor.y
+                int(section_height * (j + 1)),  # Adjust max_y with monitor.y
             )
             for j in range(resolution)
             for i in range(resolution)
         ]
 
         return screen_region_list
+
+    @staticmethod
+    def find_screen_region(x, y, monitor, resolution):
+        regions = MonitorUtility.create_screen_region_list(monitor, resolution)
+        for region in regions:
+            if region.is_point_in_region(x, y):
+                return region
 
     @staticmethod
     def create_positions_list(monitor, resolution: int):
@@ -69,7 +74,7 @@ class MonitorUtility:
 
         # Generate NxN grid of points
         positions = [
-            (monitor.x + step_x * col, monitor.y + step_y * row)
+            (step_x * col, step_y * row)
             for row in range(resolution)
             for col in range(resolution)
         ]
