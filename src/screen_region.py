@@ -60,6 +60,13 @@ class MonitorUtility:
         return screen_region_list
 
     @staticmethod
+    def find_screen_region(x, y, monitor, resolution):
+        regions = MonitorUtility.create_screen_region_list(monitor, resolution)
+        for region in regions:
+            if region.is_point_in_region(x, y):
+                return region
+
+    @staticmethod
     def create_positions_list(monitor, resolution: int):
         # Define NxN grid spacing
         step_x = monitor.width // (resolution - 1)  # X spacing

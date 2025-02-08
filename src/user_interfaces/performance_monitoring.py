@@ -4,6 +4,7 @@ from tkinter import messagebox
 import numpy as np
 from screeninfo import Monitor
 
+from src.screen_region import MonitorUtility
 from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 from src.user_interfaces.gui_base_class import BaseGUITest
 
@@ -59,39 +60,7 @@ class PerformanceMonitoringGUI(BaseGUITest):
             self.index -= 1
             self.draw_element()
 
-    def report_results(self):
-        from src.screen_region import MonitorUtility
-
-        # Create screen regions based on the monitor
-        regions = MonitorUtility.create_screen_region_list(self.monitor, resolution=2)
-
-        # Map positions and predictions to their corresponding regions
-        target_screen_regions = [
-            region
-            for position in self.positions
-            for region in regions
-            if region.is_point_in_region(position[0], position[1])
-        ]
-
-        predict_screen_regions = [
-            region
-            for prediction in self.predictions
-            for region in regions
-            if region.is_point_in_region(prediction[0], prediction[1])
-        ]
-
-        # Compare target and predicted regions
-        results = [
-            (target, prediction, target == prediction)
-            for target, prediction in zip(target_screen_regions, predict_screen_regions)
-        ]
-
-        # Handle the results (e.g., logging or returning for further processing)
-        for target, prediction, is_accurate in results:
-            if is_accurate:
-                print(target, prediction)
-                pass
-
+    def _calculate_rmse(self):
         if len(self.predictions) == len(self.positions):
             errors = np.array(self.predictions) - np.array(self.positions)
             rmse = np.sqrt(np.mean(errors**2))
@@ -100,3 +69,33 @@ class PerformanceMonitoringGUI(BaseGUITest):
             )
         else:
             messagebox.showinfo("Info", "Performance monitoring complete!")
+
+    def report_results(self):
+        # Map positions and predictions to their corresponding regions
+        target_screen_regions = [
+            MonitorUtility.find_screen_region(position[0], position[1], self.monitor, 2)
+            for position in self.positions
+        ]
+
+        predict_screen_regions = [
+            MonitorUtility.find_screen_region(
+                prediction[0], prediction[1], self.monitor, 2
+            )
+            for prediction in self.predictions
+        ]
+
+        # Compare target and predicted regions
+        results = [
+            (target, prediction, target == prediction)
+            for target, prediction in zip(target_screen_regions, predict_screen_regions)
+        ]
+
+        # Handle the results
+        for target, prediction, is_accurate in results:
+            print(f"Target: {target}.")
+            if is_accurate:
+                print("Correct!\n")
+            else:
+                print("Incorrect!\n")
+
+        self._calculate_rmse()
