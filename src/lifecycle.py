@@ -76,12 +76,26 @@ class ApplicationLifecycle:
         else:
             self.vtc.load_profile(profile_id)
 
+    def save_profile(self):
+        """Save the current profile with the given name."""
+        choice = input("Save profile? [Y/N]: ")
+
+        if choice.lower() == "y":
+            profile_name = input("Enter a profile name: ")
+            self.vtc.save_profile(profile_name)
+        elif choice.lower() == "n":
+            return
+        else:
+            print("Invalid input. Please enter 'Y' or 'N'.")
+            self.save_profile()
+
     def create_new_profile(self):
         """Handles new profile creation with calibration."""
 
         positions = MonitorUtility.create_positions_list(self.monitor, 3)
         pcg = ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
         pcg.run()
+        self.save_profile()
 
     def run_performance_analysis(self):
         choice = input("Run performance analysis? [Y/N]: ")
