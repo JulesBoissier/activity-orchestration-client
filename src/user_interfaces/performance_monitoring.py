@@ -1,5 +1,5 @@
 import random
-from tkinter import messagebox
+from tkinter import Button, Text, Toplevel, messagebox
 
 import numpy as np
 from screeninfo import Monitor
@@ -64,13 +64,21 @@ class PerformanceMonitoringGUI(BaseGUITest):
         if len(self.predictions) == len(self.positions):
             errors = np.array(self.predictions) - np.array(self.positions)
             rmse = np.sqrt(np.mean(errors**2))
-            messagebox.showinfo(
-                "Info", f"Performance monitoring complete! RMSE: {rmse:.2f}"
-            )
+            return rmse
         else:
-            messagebox.showinfo("Info", "Performance monitoring complete!")
+            return None
 
-    def report_results(self):
+    def _calculate_confusion_matrix(self):
+        # Define the four screen regions
+        screen_regions = MonitorUtility.create_screen_region_list(
+            self.monitor, resolution=2
+        )
+
+        # Initialize a confusion matrix with zeros (4x4 for 4 regions)
+        confusion_matrix = np.zeros(
+            (len(screen_regions), len(screen_regions)), dtype=int
+        )
+
         # Map positions and predictions to their corresponding regions
         target_screen_regions = [
             MonitorUtility.find_screen_region(position[0], position[1], self.monitor, 2)
@@ -84,18 +92,40 @@ class PerformanceMonitoringGUI(BaseGUITest):
             for prediction in self.predictions
         ]
 
-        # Compare target and predicted regions
-        results = [
-            (target, prediction, target == prediction)
-            for target, prediction in zip(target_screen_regions, predict_screen_regions)
-        ]
+        # Populate the confusion matrix
+        for target, prediction in zip(target_screen_regions, predict_screen_regions):
+            target_idx = screen_regions.index(target)
+            prediction_idx = screen_regions.index(prediction)
+            confusion_matrix[target_idx, prediction_idx] += 1
 
-        # Handle the results
-        for target, prediction, is_accurate in results:
-            print(f"Target: {target}.")
-            if is_accurate:
-                print("Correct!\n")
-            else:
-                print("Incorrect!\n")
+        # Calculate accuracy
+        total_predictions = np.sum(confusion_matrix)
+        correct_predictions = np.trace(confusion_matrix)
+        accuracy = (
+            correct_predictions / total_predictions if total_predictions > 0 else 0
+        )
 
-        self._calculate_rmse()
+        return confusion_matrix, accuracy
+
+    def report_results(self):
+        # Calculate RMSE
+        rmse = self._calculate_rmse()
+        if rmse is not None:
+            print(f"Performance monitoring complete! RMSE: {rmse:.2f}")
+        else:
+            print(
+                "Performance monitoring complete! No RMSE calculated due to mismatched data."
+            )
+
+        # Calculate Confusion Matrix and Accuracy
+        confusion_matrix, accuracy = self._calculate_confusion_matrix()
+        print("Confusion Matrix:")
+        print(confusion_matrix)
+        print(f"Accuracy: {accuracy * 100:.2f}%")
+
+        # Generate a detailed report
+        detailed_report = "Confusion Matrix:\n"
+        detailed_report += "\n".join(
+            ["\t".join(map(str, row)) for row in confusion_matrix]
+        )
+        detailed_report += f"\n\nAccuracy: {accuracy * 100:.2f}%"
