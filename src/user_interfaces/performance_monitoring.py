@@ -70,6 +70,55 @@ class PerformanceMonitoringGUI(BaseGUITest):
         else:
             messagebox.showinfo("Info", "Performance monitoring complete!")
 
+    def _calculate_confusion_matrix(self):
+        # Define the four screen regions
+        screen_regions = MonitorUtility.create_screen_region_list(
+            self.monitor, resolution=2
+        )
+
+        # Initialize a confusion matrix with zeros (4x4 for 4 regions)
+        confusion_matrix = np.zeros(
+            (len(screen_regions), len(screen_regions)), dtype=int
+        )
+
+        # Map positions and predictions to their corresponding regions
+        target_screen_regions = [
+            MonitorUtility.find_screen_region(position[0], position[1], self.monitor, 2)
+            for position in self.positions
+        ]
+
+        predict_screen_regions = [
+            MonitorUtility.find_screen_region(
+                prediction[0], prediction[1], self.monitor, 2
+            )
+            for prediction in self.predictions
+        ]
+
+        print("SCREEN REGIONS")
+        print(screen_regions)
+        for target, prediction in zip(target_screen_regions, predict_screen_regions):
+            target_idx = screen_regions.index(target)
+            prediction_idx = screen_regions.index(prediction)
+
+            confusion_matrix[target_idx, prediction_idx] += 1
+
+        # Calculate accuracy
+        total_predictions = np.sum(confusion_matrix)
+        correct_predictions = np.trace(confusion_matrix)
+        accuracy = (
+            correct_predictions / total_predictions if total_predictions > 0 else 0
+        )
+
+        # Display the results
+        print("Confusion Matrix:")
+        print(confusion_matrix)
+        print(f"Accuracy: {accuracy * 100:.2f}%")
+
+        messagebox.showinfo(
+            "Confusion Matrix Results",
+            f"Confusion Matrix:\n{confusion_matrix}\n\nAccuracy: {accuracy * 100:.2f}%",
+        )
+
     def report_results(self):
         # Map positions and predictions to their corresponding regions
         target_screen_regions = [
@@ -99,3 +148,4 @@ class PerformanceMonitoringGUI(BaseGUITest):
                 print("Incorrect!\n")
 
         self._calculate_rmse()
+        self._calculate_confusion_matrix()
