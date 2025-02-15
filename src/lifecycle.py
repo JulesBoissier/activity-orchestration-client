@@ -109,7 +109,7 @@ class ApplicationLifecycle:
             self.run_performance_analysis()
 
     def _performance_analysis(self):
-        pmg = PerformanceMonitoringGUI(self.monitor, 5, self.wwc, self.vtc)
+        pmg = PerformanceMonitoringGUI(self.monitor, 10, self.wwc, self.vtc)
         pmg.run()
 
     def monitor_focus(self):

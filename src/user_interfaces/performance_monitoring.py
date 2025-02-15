@@ -122,10 +122,3 @@ class PerformanceMonitoringGUI(BaseGUITest):
         print("Confusion Matrix:")
         print(confusion_matrix)
         print(f"Accuracy: {accuracy * 100:.2f}%")
-
-        # Generate a detailed report
-        detailed_report = "Confusion Matrix:\n"
-        detailed_report += "\n".join(
-            ["\t".join(map(str, row)) for row in confusion_matrix]
-        )
-        detailed_report += f"\n\nAccuracy: {accuracy * 100:.2f}%"
