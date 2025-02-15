@@ -101,15 +101,16 @@ class ApplicationLifecycle:
         choice = input("Run performance analysis? [Y/N]: ")
 
         if choice.lower() == "y":
-            self._performance_analysis()
+            nbr_of_samples = int(input("Number of samples to run analysis on:"))
+            self._performance_analysis(nbr_of_samples=nbr_of_samples)
         elif choice.lower() == "n":
             return
         else:
             print("Invalid input. Please enter 'Y' or 'N'.")
             self.run_performance_analysis()
 
-    def _performance_analysis(self):
-        pmg = PerformanceMonitoringGUI(self.monitor, 10, self.wwc, self.vtc)
+    def _performance_analysis(self, nbr_of_samples):
+        pmg = PerformanceMonitoringGUI(self.monitor, nbr_of_samples, self.wwc, self.vtc)
         pmg.run()
 
     def monitor_focus(self):
