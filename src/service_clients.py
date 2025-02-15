@@ -29,8 +29,6 @@ class WindowsWebcamClient(ServiceClient):
         if response.status_code != 200:
             raise Exception(f"Failed to connect to camera feed: {response.status_code}")
 
-        print("Reading from stream...")
-
         # Read from the stream
         byte_stream = b""
         for chunk in response.iter_content(chunk_size=1024):

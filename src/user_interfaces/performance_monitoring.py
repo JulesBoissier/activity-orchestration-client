@@ -1,5 +1,4 @@
 import random
-from tkinter import Button, Text, Toplevel, messagebox
 
 import numpy as np
 from screeninfo import Monitor
@@ -110,22 +109,15 @@ class PerformanceMonitoringGUI(BaseGUITest):
     def report_results(self):
         # Calculate RMSE
         rmse = self._calculate_rmse()
+        confusion_matrix, accuracy = self._calculate_confusion_matrix()
+
+        print("Performance monitoring complete!")
         if rmse is not None:
-            print(f"Performance monitoring complete! RMSE: {rmse:.2f}")
+            print(f"RMSE: {rmse:.2f}")
         else:
-            print(
-                "Performance monitoring complete! No RMSE calculated due to mismatched data."
-            )
+            print("No RMSE calculated due to mismatched data.")
 
         # Calculate Confusion Matrix and Accuracy
-        confusion_matrix, accuracy = self._calculate_confusion_matrix()
         print("Confusion Matrix:")
         print(confusion_matrix)
         print(f"Accuracy: {accuracy * 100:.2f}%")
-
-        # Generate a detailed report
-        detailed_report = "Confusion Matrix:\n"
-        detailed_report += "\n".join(
-            ["\t".join(map(str, row)) for row in confusion_matrix]
-        )
-        detailed_report += f"\n\nAccuracy: {accuracy * 100:.2f}%"
