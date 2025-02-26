@@ -6,7 +6,7 @@ An orchestration tool leveraging a vision tracking service and OS data to report
 This dockerized module sits at the center of the Reflective Application, connecting to the required services, running the core application lifecycle and user-interfaces.
 
 <div align="center">
-  <img src="assets/reflective_architecture_.png" alt="architecture_diagram" width="900"/>
+  <img src="assets/reflective_architecture.png" alt="architecture_diagram" width="900"/>
   <p><strong>Fig 1.</strong> High-Level Architecture diagram of the Reflective Application and how the Activity Orchestration Module fits into it.</p>
 </div>
 
