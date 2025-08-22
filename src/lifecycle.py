@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
@@ -37,10 +38,12 @@ class ApplicationLifecycle:
 
     def check_services(self):
         """Ensure that both services are running before proceeding."""
+
+        # ? Might be worth going for exponential back-off here.
         if not (self.vtc.get_service_status() and self.wwc.get_service_status()):
-            raise Exception(
-                "Service connection error: VisionTrackingClient or WindowsWebcamClient is unavailable."
-            )
+            print(f"Global health-check failed. Re-trying in {self.period} seconds.")
+            time.sleep(self.period)
+            self.check_services()
 
     def _display_profiles(self):
         profiles = self.vtc.list_profiles()["profiles"]
