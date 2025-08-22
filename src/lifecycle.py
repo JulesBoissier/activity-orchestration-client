@@ -36,14 +36,20 @@ class ApplicationLifecycle:
 
         self.now = datetime.now()
 
-    def check_services(self):
+    def check_services(self, max_retries: int = None):
         """Ensure that both services are running before proceeding."""
+        attempts = 0
 
-        # ? Might be worth going for exponential back-off here.
-        if not (self.vtc.get_service_status() and self.wwc.get_service_status()):
+        while True:
+            if self.vtc.get_service_status() and self.wwc.get_service_status():
+                return True
+
             print(f"Global health-check failed. Re-trying in {self.period} seconds.")
             time.sleep(self.period)
-            self.check_services()
+
+            attempts += 1
+            if max_retries is not None and attempts >= max_retries:
+                raise Exception("Global Health Check Failed: Too many retries.")
 
     def _display_profiles(self):
         profiles = self.vtc.list_profiles()["profiles"]
