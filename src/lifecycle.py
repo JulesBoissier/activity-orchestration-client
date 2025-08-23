@@ -41,7 +41,10 @@ class ApplicationLifecycle:
         attempts = 0
 
         while True:
-            if self.vtc.get_service_status() and self.wwc.get_service_status():
+            vtc_ok = self.vtc.get_service_status()
+            wwc_ok = self.wwc.get_service_status()
+
+            if vtc_ok and wwc_ok:
                 return True
 
             print(f"Global health-check failed. Re-trying in {self.period} seconds.")
