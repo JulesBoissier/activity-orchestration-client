@@ -53,6 +53,12 @@ class ProfileManager:
             print("Invalid input. Please enter 'Y' or 'N'.")
             self.save_profile()
 
+    def delete_profile(self, profile_id: int):
+        self.vtc.delete_profile(profile_id)
+
+    def reset_profile(self, profile_id: int):
+        self.vtc.reset_profile(profile_id)
+
     def create_new_profile(self):
         positions = MonitorUtility.create_positions_list(self.monitor, 3)
         pcg = ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
