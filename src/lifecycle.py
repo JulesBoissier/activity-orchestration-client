@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
@@ -35,12 +36,23 @@ class ApplicationLifecycle:
 
         self.now = datetime.now()
 
-    def check_services(self):
+    def check_services(self, max_retries: int = None):
         """Ensure that both services are running before proceeding."""
-        if not (self.vtc.get_service_status() and self.wwc.get_service_status()):
-            raise Exception(
-                "Service connection error: VisionTrackingClient or WindowsWebcamClient is unavailable."
-            )
+        attempts = 0
+
+        while True:
+            vtc_ok = self.vtc.get_service_status()
+            wwc_ok = self.wwc.get_service_status()
+
+            if vtc_ok and wwc_ok:
+                return True
+
+            print(f"Global health-check failed. Re-trying in {self.period} seconds.")
+            time.sleep(self.period)
+
+            attempts += 1
+            if max_retries is not None and attempts >= max_retries:
+                raise Exception("Global Health Check Failed: Too many retries.")
 
     def _display_profiles(self):
         profiles = self.vtc.list_profiles()["profiles"]
