@@ -17,12 +17,12 @@ class ServiceClient(ABC):
             return True
         except requests.ConnectionError:
             print(
-                f"Windows Webcam service is down: Connection Error for host at {self.root_url}."
+                f"{self.__class__.__name__} is down: Connection Error for host at {self.root_url}."
             )
             return False
         except requests.Timeout:
             print(
-                f"Windows Webcam service is down: Timeout reached after {self.timeout} seconds for host at {self.root_url}."
+                f"{self.__class__.__name__} is down: Timeout reached after {self.timeout} seconds for host at {self.root_url}."
             )
             return False
 
