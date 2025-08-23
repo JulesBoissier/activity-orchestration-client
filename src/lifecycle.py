@@ -14,6 +14,66 @@ from src.user_interfaces.profile_creation import ProfileCreationGUI
 load_dotenv()
 
 
+class ProfileManager:
+    def __init__(self, vtc, wwc, monitor):
+        self.vtc = vtc
+        self.wwc = wwc
+        self.monitor = monitor
+
+    def display_profiles(self):
+        profiles = self.vtc.list_profiles()["profiles"]
+
+        if not profiles:
+            print("No profiles found.")
+            return None
+
+        # Convert profiles into a table format
+        table = [
+            [profile["id"], profile["profile_name"], profile["updated_at"]]
+            for profile in profiles
+        ]
+        print(
+            tabulate(
+                table, headers=["ID", "Profile Name", "Last Updated"], tablefmt="grid"
+            )
+        )
+
+        return profiles  # Return the list for further use if needed
+
+    def save_profile(self):
+        """Save the current profile with the given name."""
+        choice = input("Save profile? [Y/N]: ")
+
+        if choice.lower() == "y":
+            profile_name = input("Enter a profile name: ")
+            self.vtc.save_profile(profile_name)
+        elif choice.lower() == "n":
+            return
+        else:
+            print("Invalid input. Please enter 'Y' or 'N'.")
+            self.save_profile()
+
+    def create_new_profile(self):
+        positions = MonitorUtility.create_positions_list(self.monitor, 3)
+        pcg = ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
+        pcg.run()
+        self.save_profile()
+
+    def select_or_create_profile(self):
+        """Prompt user to select an existing profile or create a new one."""
+
+        print(
+            "Select a Profile ID from the following, or press enter to create a new profile:"
+        )
+        self.display_profiles()
+        profile_id = input()
+
+        if profile_id == "0" or not profile_id:
+            self.create_new_profile()
+        else:
+            self.vtc.load_profile(profile_id)
+
+
 class ApplicationLifecycle:
     def __init__(self, monitor_index: int = 1, period: int = 2):
         """Initialize the application lifecycle with a given period (seconds)."""
@@ -34,6 +94,10 @@ class ApplicationLifecycle:
         self.regions = MonitorUtility.create_screen_region_list(self.monitor, 2)
         self.faw = FocusAreaWorker(self.wwc, self.vtc, self.regions)
 
+        self.profile_manager = ProfileManager(
+            vtc=self.vtc, wwc=self.wwc, monitor=self.monitor
+        )
+
         self.now = datetime.now()
 
     def check_services(self, max_retries: int = None):
@@ -53,61 +117,6 @@ class ApplicationLifecycle:
             attempts += 1
             if max_retries is not None and attempts >= max_retries:
                 raise Exception("Global Health Check Failed: Too many retries.")
-
-    def _display_profiles(self):
-        profiles = self.vtc.list_profiles()["profiles"]
-
-        if not profiles:
-            print("No profiles found.")
-            return None
-
-        # Convert profiles into a table format
-        table = [
-            [profile["id"], profile["profile_name"], profile["updated_at"]]
-            for profile in profiles
-        ]
-        print(
-            tabulate(
-                table, headers=["ID", "Profile Name", "Last Updated"], tablefmt="grid"
-            )
-        )
-
-        return profiles  # Return the list for further use if needed
-
-    def select_or_create_profile(self):
-        """Prompt user to select an existing profile or create a new one."""
-
-        print(
-            "Select a Profile ID from the following, or press enter to create a new profile:"
-        )
-        self._display_profiles()
-        profile_id = input()
-
-        if profile_id == "0" or not profile_id:
-            self.create_new_profile()
-        else:
-            self.vtc.load_profile(profile_id)
-
-    def save_profile(self):
-        """Save the current profile with the given name."""
-        choice = input("Save profile? [Y/N]: ")
-
-        if choice.lower() == "y":
-            profile_name = input("Enter a profile name: ")
-            self.vtc.save_profile(profile_name)
-        elif choice.lower() == "n":
-            return
-        else:
-            print("Invalid input. Please enter 'Y' or 'N'.")
-            self.save_profile()
-
-    def create_new_profile(self):
-        """Handles new profile creation with calibration."""
-
-        positions = MonitorUtility.create_positions_list(self.monitor, 3)
-        pcg = ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
-        pcg.run()
-        self.save_profile()
 
     def run_performance_analysis(self):
         choice = input("Run performance analysis? [Y/N]: ")
@@ -145,7 +154,7 @@ class ApplicationLifecycle:
     def run(self):
         """Start the application lifecycle."""
         self.check_services()
-        self.select_or_create_profile()
+        self.profile_manager.select_or_create_profile()
         self.run_performance_analysis()
         self.monitor_focus()
 
