@@ -12,10 +12,10 @@ class ProfileCreationGUI(BaseGUITest):
         self,
         monitor: Monitor,
         positions: List[Tuple[int, int]],
-        wwc: WindowsWebcamClient,
-        vtc: VisionTrackingClient,
+        windows_webcam_client: WindowsWebcamClient,
+        vision_tracking_client: VisionTrackingClient,
     ):
-        super().__init__(monitor, wwc, vtc)
+        super().__init__(monitor, windows_webcam_client, vision_tracking_client)
         self.positions = positions
         self.images = []
 
@@ -37,7 +37,7 @@ class ProfileCreationGUI(BaseGUITest):
             self.draw_element()
             return
 
-        image = self.wwc.get_camera_input()
+        image = self.windows_webcam_client.get_camera_input()
         self.images.append(image)
 
         if self.index < len(self.positions) - 1:
@@ -55,5 +55,7 @@ class ProfileCreationGUI(BaseGUITest):
 
     def send_data(self):
         for position, image in zip(self.positions, self.images):
-            self.vtc.add_calibration_point(position[0], position[1], image)
+            self.vision_tracking_client.add_calibration_point(
+                position[0], position[1], image
+            )
         messagebox.showinfo("Info", "Data Sent Successfully!")
