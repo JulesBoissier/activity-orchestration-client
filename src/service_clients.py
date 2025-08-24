@@ -80,6 +80,12 @@ class VisionTrackingClient(ServiceClient):
         response = requests.post(url, params=params)
         return response.status_code
 
+    def reset_profile(self, profile_id):
+        url = self.root_url + "/reset_profile"
+        params = {"profile_id": profile_id}
+        response = requests.post(url, params=params)
+        return response.status_code
+
     def add_calibration_point(self, x, y, image):
         url = self.root_url + "/cal_point"
 
