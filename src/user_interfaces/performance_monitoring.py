@@ -13,10 +13,10 @@ class PerformanceMonitoringGUI(BaseGUITest):
         self,
         monitor: Monitor,
         nbr_of_points: int,
-        wwc: WindowsWebcamClient,
-        vtc: VisionTrackingClient,
+        windows_webcam_client: WindowsWebcamClient,
+        vision_tracking_client: VisionTrackingClient,
     ):
-        super().__init__(monitor, wwc, vtc)
+        super().__init__(monitor, windows_webcam_client, vision_tracking_client)
 
         self.positions = [
             (random.randint(0, monitor.width), random.randint(0, monitor.height))
@@ -42,8 +42,8 @@ class PerformanceMonitoringGUI(BaseGUITest):
             self.draw_element()
             return
 
-        image = self.wwc.get_camera_input()
-        prediction = self.vtc.predict_por(image)
+        image = self.windows_webcam_client.get_camera_input()
+        prediction = self.vision_tracking_client.predict_por(image)
         self.predictions.append(prediction)
 
         if self.index < len(self.positions) - 1:

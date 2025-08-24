@@ -10,11 +10,14 @@ from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 class BaseGUITest(ABC):
     def __init__(
-        self, monitor: Monitor, wwc: WindowsWebcamClient, vtc: VisionTrackingClient
+        self,
+        monitor: Monitor,
+        windows_webcam_client: WindowsWebcamClient,
+        vision_tracking_client: VisionTrackingClient,
     ):
         self.monitor = monitor
-        self.wwc = wwc
-        self.vtc = vtc
+        self.windows_webcam_client = windows_webcam_client
+        self.vision_tracking_client = vision_tracking_client
         self.started_calibration = False
 
     def run(self):

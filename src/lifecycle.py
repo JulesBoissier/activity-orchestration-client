@@ -15,13 +15,13 @@ load_dotenv()
 
 
 class ProfileManager:
-    def __init__(self, vtc, wwc, monitor):
-        self.vtc = vtc
-        self.wwc = wwc
+    def __init__(self, vision_tracking_client, windows_webcam_client, monitor):
+        self.vision_tracking_client = vision_tracking_client
+        self.windows_webcam_client = windows_webcam_client
         self.monitor = monitor
 
     def display_profiles(self):
-        profiles = self.vtc.list_profiles()["profiles"]
+        profiles = self.vision_tracking_client.list_profiles()["profiles"]
 
         if not profiles:
             print("No profiles found.")
@@ -46,7 +46,7 @@ class ProfileManager:
 
         if choice.lower() == "y":
             profile_name = input("Enter a profile name: ")
-            self.vtc.save_profile(profile_name)
+            self.vision_tracking_client.save_profile(profile_name)
         elif choice.lower() == "n":
             return
         else:
@@ -54,14 +54,19 @@ class ProfileManager:
             self.save_profile()
 
     def delete_profile(self, profile_id: int):
-        self.vtc.delete_profile(profile_id)
+        self.vision_tracking_client.delete_profile(profile_id)
 
     def reset_profile(self, profile_id: int):
-        self.vtc.reset_profile(profile_id)
+        self.vision_tracking_client.reset_profile(profile_id)
 
     def create_new_profile(self):
         positions = MonitorUtility.create_positions_list(self.monitor, 3)
-        pcg = ProfileCreationGUI(self.monitor, positions, self.wwc, self.vtc)
+        pcg = ProfileCreationGUI(
+            self.monitor,
+            positions,
+            self.windows_webcam_client,
+            self.vision_tracking_client,
+        )
         pcg.run()
         self.save_profile()
 
@@ -77,7 +82,7 @@ class ProfileManager:
         if profile_id == "0" or not profile_id:
             self.create_new_profile()
         else:
-            self.vtc.load_profile(profile_id)
+            self.vision_tracking_client.load_profile(profile_id)
 
 
 class ApplicationLifecycle:
@@ -86,11 +91,11 @@ class ApplicationLifecycle:
         self.period = period
 
         # Initialize service clients
-        self.vtc = VisionTrackingClient(
+        self.vision_tracking_client = VisionTrackingClient(
             service_ip=os.getenv("VISION_TRACKING_SERVICE_IP", "127.0.0.1"),
             service_port=int(os.getenv("VISION_TRACKING_SERVICE_PORT", 8000)),
         )
-        self.wwc = WindowsWebcamClient(
+        self.windows_webcam_client = WindowsWebcamClient(
             service_ip=os.getenv("WINDOWS_WEBCAM_SERVICE_IP", "127.0.0.1"),
             service_port=int(os.getenv("WINDOWS_WEBCAM_SERVICE_PORT", 8001)),
         )
@@ -98,10 +103,14 @@ class ApplicationLifecycle:
         # Create screen regions
         self.monitor = MonitorUtility.select_monitor(monitor_index)
         self.regions = MonitorUtility.create_screen_region_list(self.monitor, 2)
-        self.faw = FocusAreaWorker(self.wwc, self.vtc, self.regions)
+        self.focus_area_worker = FocusAreaWorker(
+            self.windows_webcam_client, self.vision_tracking_client, self.regions
+        )
 
         self.profile_manager = ProfileManager(
-            vtc=self.vtc, wwc=self.wwc, monitor=self.monitor
+            vision_tracking_client=self.vision_tracking_client,
+            windows_webcam_client=self.windows_webcam_client,
+            monitor=self.monitor,
         )
 
         self.now = datetime.now()
@@ -111,10 +120,10 @@ class ApplicationLifecycle:
         attempts = 0
 
         while True:
-            vtc_ok = self.vtc.get_service_status()
-            wwc_ok = self.wwc.get_service_status()
+            vision_tracking_client_ok = self.vision_tracking_client.get_service_status()
+            windows_webcam_client_ok = self.windows_webcam_client.get_service_status()
 
-            if vtc_ok and wwc_ok:
+            if vision_tracking_client_ok and windows_webcam_client_ok:
                 return True
 
             print(f"Global health-check failed. Re-trying in {self.period} seconds.")
@@ -137,7 +146,12 @@ class ApplicationLifecycle:
             self.run_performance_analysis()
 
     def _performance_analysis(self, nbr_of_samples):
-        pmg = PerformanceMonitoringGUI(self.monitor, nbr_of_samples, self.wwc, self.vtc)
+        pmg = PerformanceMonitoringGUI(
+            self.monitor,
+            nbr_of_samples,
+            self.windows_webcam_client,
+            self.vision_tracking_client,
+        )
         pmg.run()
 
     def monitor_focus(self):
@@ -147,8 +161,8 @@ class ApplicationLifecycle:
                 self.check_services()  # Ensure connections are alive
 
                 # Predict point of regard and determine focus region
-                x, y = self.faw.predict_point_of_regard()
-                region = self.faw.get_focus_region(x, y)
+                x, y = self.focus_area_worker.predict_point_of_regard()
+                region = self.focus_area_worker.get_focus_region(x, y)
                 print(region)
 
                 # TODO: Integrate OS-Watchdog for retrieving OS state
