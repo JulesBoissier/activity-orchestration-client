@@ -8,7 +8,13 @@ class TestApplicationLifecycleHealthCheck(unittest.TestCase):
     MAX_RETRIES = 3
 
     def setUp(self):
-        self.app = ApplicationLifecycle(period=0.1)
+        # Patching to run in headless environments.
+        dummy_monitor = MagicMock()
+        with patch(
+            "src.screen_region.MonitorUtility.select_monitor",
+            return_value=dummy_monitor,
+        ):
+            self.app = ApplicationLifecycle(period=0.1)
 
     @patch(
         "src.service_clients.VisionTrackingClient.get_service_status", return_value=True
