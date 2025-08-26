@@ -40,10 +40,10 @@ class TestApplicationLifecycleHealthCheck(unittest.TestCase):
     def test_negative_global_health(
         self, windows_webcam_client_get, vision_tracking_client_get
     ):
-        app = ApplicationLifecycle(period=0.1)
+        # app = ApplicationLifecycle(period=0.1)
 
         with self.assertRaises(Exception) as context:
-            app.check_services(max_retries=self.MAX_RETRIES)
+            self.app.check_services(max_retries=self.MAX_RETRIES)
 
         self.assertEqual(windows_webcam_client_get.call_count, self.MAX_RETRIES)
         self.assertEqual(vision_tracking_client_get.call_count, self.MAX_RETRIES)
