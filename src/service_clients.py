@@ -9,16 +9,21 @@ import requests
 class ServiceClient(ABC):
     def __init__(self, service_ip, service_port):
         self.root_url = f"http://{service_ip}:{service_port}"
+        self.timeout = 1
 
     def get_service_status(self):
         try:
-            requests.get(self.root_url + "/health", timeout=1)
+            requests.get(self.root_url + "/health", timeout=self.timeout)
             return True
-        except requests.ConnectionError as e:
-            print(f"Windows Webcam service is down: {e}")
+        except requests.ConnectionError:
+            print(
+                f"{self.__class__.__name__} is down: Connection Error for host at {self.root_url}."
+            )
             return False
-        except requests.Timeout as e:
-            print(f"Windows Webcam service is down: {e}")
+        except requests.Timeout:
+            print(
+                f"{self.__class__.__name__} is down: Timeout reached after {self.timeout} seconds for host at {self.root_url}."
+            )
             return False
 
 
@@ -71,6 +76,12 @@ class VisionTrackingClient(ServiceClient):
 
     def delete_profile(self, profile_id):
         url = self.root_url + "/delete_profile"
+        params = {"profile_id": profile_id}
+        response = requests.post(url, params=params)
+        return response.status_code
+
+    def reset_profile(self, profile_id):
+        url = self.root_url + "/reset_profile"
         params = {"profile_id": profile_id}
         response = requests.post(url, params=params)
         return response.status_code
