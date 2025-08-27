@@ -7,7 +7,11 @@ from tabulate import tabulate
 
 from src.focus_area_worker import FocusAreaWorker
 from src.screen_region import MonitorUtility
-from src.service_clients import VisionTrackingClient, WindowsWebcamClient
+from src.service_clients import (
+    SystemWatchdogClient,
+    VisionTrackingClient,
+    WindowsWebcamClient,
+)
 from src.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
 from src.user_interfaces.profile_creation import ProfileCreationGUI
 
@@ -100,6 +104,11 @@ class ApplicationLifecycle:
             service_port=int(os.getenv("WINDOWS_WEBCAM_SERVICE_PORT", 8001)),
         )
 
+        self.system_watchdog_client = SystemWatchdogClient(
+            service_ip=os.getenv("SYSTEM_WATCHDOG_SERVICE_IP", "127.0.0.1"),
+            service_port=int(os.getenv("SYSTEM_WATCHDOG_SERVICE_PORT", 8002)),
+        )
+
         # Create screen regions
         self.monitor = MonitorUtility.select_monitor(monitor_index)
         self.regions = MonitorUtility.create_screen_region_list(self.monitor, 2)
@@ -122,8 +131,13 @@ class ApplicationLifecycle:
         while True:
             vision_tracking_client_ok = self.vision_tracking_client.get_service_status()
             windows_webcam_client_ok = self.windows_webcam_client.get_service_status()
+            system_watchdog_client_ok = self.system_watchdog_client.get_service_status()
 
-            if vision_tracking_client_ok and windows_webcam_client_ok:
+            if (
+                vision_tracking_client_ok
+                and windows_webcam_client_ok
+                and system_watchdog_client_ok
+            ):
                 return True
 
             print(f"Global health-check failed. Re-trying in {self.period} seconds.")

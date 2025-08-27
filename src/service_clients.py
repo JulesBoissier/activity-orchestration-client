@@ -56,6 +56,13 @@ class WindowsWebcamClient(ServiceClient):
         return None  # Return None if no frame is found
 
 
+class SystemWatchdogClient(ServiceClient):
+    def get_windows_info(self):
+        url = self.root_url + "/windows_info"
+        response = requests.get(url)
+        return response.json()
+
+
 class VisionTrackingClient(ServiceClient):
     def save_profile(self, name):
         url = self.root_url + "/save_profile"
