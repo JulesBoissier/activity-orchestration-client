@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
+from src.clients.system_watchdog_client import SystemWatchdogClient
 from src.clients.vision_tracking_client import VisionTrackingClient
 from src.clients.windows_webcam_client import WindowsWebcamClient
 
@@ -47,3 +48,7 @@ class TestWindowsWebcamClient(ServiceClientTestsMixin, unittest.TestCase):
 
 class TestVisionTrackingClient(ServiceClientTestsMixin, unittest.TestCase):
     CLIENT_CLASS = VisionTrackingClient
+
+
+class TestSystemWatchdogClient(ServiceClientTestsMixin, unittest.TestCase):
+    CLIENT_CLASS = SystemWatchdogClient
