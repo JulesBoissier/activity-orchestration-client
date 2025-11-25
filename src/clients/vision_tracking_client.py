@@ -1,59 +1,10 @@
-from abc import ABC
 from io import BytesIO
 
 import cv2
 import numpy as np
 import requests
 
-
-class ServiceClient(ABC):
-    def __init__(self, service_ip, service_port):
-        self.root_url = f"http://{service_ip}:{service_port}"
-        self.timeout = 1
-
-    def get_service_status(self):
-        try:
-            requests.get(self.root_url + "/health", timeout=self.timeout)
-            return True
-        except requests.ConnectionError:
-            print(
-                f"{self.__class__.__name__} is down: Connection Error for host at {self.root_url}."
-            )
-            return False
-        except requests.Timeout:
-            print(
-                f"{self.__class__.__name__} is down: Timeout reached after {self.timeout} seconds for host at {self.root_url}."
-            )
-            return False
-
-
-class WindowsWebcamClient(ServiceClient):
-    def get_camera_input(self):
-        # Connect to the video stream
-        response = requests.get(self.root_url + "/video_feed", stream=True, timeout=5)
-        if response.status_code != 200:
-            raise Exception(f"Failed to connect to camera feed: {response.status_code}")
-
-        # Read from the stream
-        byte_stream = b""
-        for chunk in response.iter_content(chunk_size=1024):
-            byte_stream += chunk
-            # Look for the JPEG frame boundary
-            start = byte_stream.find(b"\xff\xd8")  # Start of JPEG
-            end = byte_stream.find(b"\xff\xd9")  # End of JPEG
-
-            if start != -1 and end != -1:
-                jpg_data = byte_stream[start : end + 2]  # Extract frame
-                byte_stream = byte_stream[end + 2 :]  # Remove processed frame
-
-                # Convert to OpenCV image
-                image = cv2.imdecode(
-                    np.frombuffer(jpg_data, dtype=np.uint8), cv2.IMREAD_COLOR
-                )
-
-                return image  # Return single frame as an OpenCV image
-
-        return None  # Return None if no frame is found
+from src.clients.service_client import ServiceClient
 
 
 class VisionTrackingClient(ServiceClient):
