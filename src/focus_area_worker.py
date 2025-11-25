@@ -1,7 +1,8 @@
 from typing import List
 
+from src.clients.vision_tracking_client import VisionTrackingClient
+from src.clients.windows_webcam_client import WindowsWebcamClient
 from src.screen_region import ScreenRegion
-from src.service_clients import VisionTrackingClient, WindowsWebcamClient
 
 
 class FocusAreaWorker:

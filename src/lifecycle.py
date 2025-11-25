@@ -5,13 +5,11 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from tabulate import tabulate
 
+from src.clients.system_watchdog_client import SystemWatchdogClient
+from src.clients.vision_tracking_client import VisionTrackingClient
+from src.clients.windows_webcam_client import WindowsWebcamClient
 from src.focus_area_worker import FocusAreaWorker
 from src.screen_region import MonitorUtility
-from src.service_clients import (
-    SystemWatchdogClient,
-    VisionTrackingClient,
-    WindowsWebcamClient,
-)
 from src.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
 from src.user_interfaces.profile_creation import ProfileCreationGUI
 
