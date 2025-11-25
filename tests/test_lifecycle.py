@@ -17,10 +17,12 @@ class TestApplicationLifecycleHealthCheck(unittest.TestCase):
             self.app = ApplicationLifecycle(period=0.1)
 
     @patch(
-        "src.service_clients.VisionTrackingClient.get_service_status", return_value=True
+        "src.clients.vision_tracking_client.VisionTrackingClient.get_service_status",
+        return_value=True,
     )
     @patch(
-        "src.service_clients.WindowsWebcamClient.get_service_status", return_value=True
+        "src.clients.windows_webcam_client.WindowsWebcamClient.get_service_status",
+        return_value=True,
     )
     def test_positive_global_health(
         self, windows_webcam_client_get, vision_tracking_client_get
@@ -31,11 +33,12 @@ class TestApplicationLifecycleHealthCheck(unittest.TestCase):
         vision_tracking_client_get.assert_called_once()
 
     @patch(
-        "src.service_clients.VisionTrackingClient.get_service_status",
+        "src.clients.vision_tracking_client.VisionTrackingClient.get_service_status",
         return_value=False,
     )
     @patch(
-        "src.service_clients.WindowsWebcamClient.get_service_status", return_value=False
+        "src.clients.windows_webcam_client.WindowsWebcamClient.get_service_status",
+        return_value=False,
     )
     def test_negative_global_health(
         self, windows_webcam_client_get, vision_tracking_client_get

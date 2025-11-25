@@ -5,7 +5,8 @@ from typing import List, Tuple
 
 from screeninfo import Monitor
 
-from src.service_clients import VisionTrackingClient, WindowsWebcamClient
+from src.clients.vision_tracking_client import VisionTrackingClient
+from src.clients.windows_webcam_client import WindowsWebcamClient
 
 
 class BaseGUITest(ABC):
