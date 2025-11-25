@@ -1,7 +1,8 @@
 from typing import Any, Dict, List
 
 import requests
-from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import MultiPolygon, Polygon, box
+from shapely.ops import unary_union
 
 from src.clients.service_client import ServiceClient
 
@@ -11,6 +12,22 @@ class SystemWatchdogClient(ServiceClient):
         url = self.root_url + "/windows_info"
         response = requests.get(url)
         return response.json()
+
+    def get_visible_windows(
+        self,
+        monitor=None,
+        exclude_exe_names: List[str] | None = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch windows from the watchdog service and compute visible portions within an optional monitor.
+        Returns a list of dicts with keys: exe_name, title, z_index, pid, clipped_rect, visible_rects, visible_area, visible_fraction.
+        """
+        data = self.get_windows_info()
+        windows: List[Dict[str, Any]] = (
+            data.get("windows", data) if isinstance(data, dict) else data
+        )
+        return self.compute_visible_windows(
+            windows=windows, monitor=monitor, exclude_exe_names=exclude_exe_names
+        )
 
     def _geometry_to_rects(self, geometry) -> List[List[int]]:
         """Convert a shapely geometry to a list of rectangle bounds [l, t, r, b].

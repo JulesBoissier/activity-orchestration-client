@@ -166,6 +166,44 @@ class ApplicationLifecycle:
         )
         pmg.run()
 
+    def _determine_viewed_window_info(self, x, y, visible_windows):
+        """Determine which window/process is being viewed given PoR (x,y) and visible window data.
+        - x, y are expected to be monitor-relative coordinates (0..monitor.width/height).
+        - visible_windows should be a list of dicts produced by compute_visible_windows (absolute coords).
+        Returns a small dict with matched process/window info, or None if no match.
+        """
+        # Convert PoR to absolute screen coordinates
+        try:
+            abs_x = self.monitor.x + x
+            abs_y = self.monitor.y + y
+        except Exception:
+            abs_x, abs_y = x, y
+
+        def point_in_rect(px, py, rect):
+            l, t, r, b = rect
+            return (l <= px < r) and (t <= py < b)
+
+        # Be robust: ensure we check in presumed front-to-back order using z_index ascending
+        ordered = sorted(visible_windows or [], key=lambda w: w.get("z_index", 0))
+
+        for w in ordered:
+            for rect in w.get("visible_rects", []):
+                if point_in_rect(abs_x, abs_y, rect):
+                    return {
+                        "x": x,
+                        "y": y,
+                        "absolute_x": abs_x,
+                        "absolute_y": abs_y,
+                        "exe_name": w.get("exe_name") or w.get("name"),
+                        "title": w.get("title"),
+                        "z_index": w.get("z_index"),
+                        "pid": w.get("pid"),
+                        "visible_rect": rect,
+                        "visible_fraction": w.get("visible_fraction", 0.0),
+                    }
+
+        return None
+
     def monitor_focus(self):
         """Main loop to track and process user focus region."""
         while True:
@@ -174,11 +212,16 @@ class ApplicationLifecycle:
 
                 # Predict point of regard and determine focus region
                 x, y = self.focus_area_worker.predict_point_of_regard()
-                region = self.focus_area_worker.get_focus_region(x, y)
-                print(region)
+                visible_windows = self.system_watchdog_client.get_visible_windows(
+                    monitor=self.monitor
+                )
+                viewed_window_info = self._determine_viewed_window_info(
+                    x, y, visible_windows
+                )
 
-                # TODO: Integrate OS-Watchdog for retrieving OS state
-                # TODO: Aggregate OS state + Region for focus info
+                print(
+                    f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
+                )
                 # TODO: Push focus info to DB
 
                 self.now = datetime.now()  # Reset timer
