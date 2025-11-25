@@ -8,7 +8,6 @@ from tabulate import tabulate
 from src.clients.system_watchdog_client import SystemWatchdogClient
 from src.clients.vision_tracking_client import VisionTrackingClient
 from src.clients.windows_webcam_client import WindowsWebcamClient
-from src.focus_area_worker import FocusAreaWorker
 from src.screen_region import MonitorUtility
 from src.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
 from src.user_interfaces.profile_creation import ProfileCreationGUI
@@ -109,10 +108,6 @@ class ApplicationLifecycle:
 
         # Create screen regions
         self.monitor = MonitorUtility.select_monitor(monitor_index)
-        self.regions = MonitorUtility.create_screen_region_list(self.monitor, 2)
-        self.focus_area_worker = FocusAreaWorker(
-            self.windows_webcam_client, self.vision_tracking_client, self.regions
-        )
 
         self.profile_manager = ProfileManager(
             vision_tracking_client=self.vision_tracking_client,
@@ -210,11 +205,16 @@ class ApplicationLifecycle:
             if datetime.now() - self.now > timedelta(seconds=self.period):
                 self.check_services()  # Ensure connections are alive
 
-                # Predict point of regard and determine focus region
-                x, y = self.focus_area_worker.predict_point_of_regard()
+                # Predict point of regard
+                image = self.windows_webcam_client.get_camera_input()
+                x, y = self.vision_tracking_client.predict_por(image=image)
+
+                # Determine visible windows
                 visible_windows = self.system_watchdog_client.get_visible_windows(
                     monitor=self.monitor
                 )
+
+                # Determine viewed window info
                 viewed_window_info = self._determine_viewed_window_info(
                     x, y, visible_windows
                 )
