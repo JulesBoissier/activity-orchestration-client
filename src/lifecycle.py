@@ -224,8 +224,7 @@ class ApplicationLifecycle:
                 print(
                     f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
                 )
-                # Push focus info to DB with timestamp
-                ts = datetime.now().isoformat()
+
                 record = (
                     f"{viewed_window_info['exe_name']} - {viewed_window_info['title']}"
                 )
