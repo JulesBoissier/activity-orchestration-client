@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from tabulate import tabulate
 
+from src.attention_tracker_store import AttentionTrackerStore
 from src.clients.system_watchdog_client import SystemWatchdogClient
 from src.clients.vision_tracking_client import VisionTrackingClient
 from src.clients.windows_webcam_client import WindowsWebcamClient
@@ -114,6 +115,7 @@ class ApplicationLifecycle:
             windows_webcam_client=self.windows_webcam_client,
             monitor=self.monitor,
         )
+        self.attention_tracker_store = AttentionTrackerStore()
 
         self.now = datetime.now()
 
@@ -222,7 +224,11 @@ class ApplicationLifecycle:
                 print(
                     f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
                 )
-                # TODO: Push focus info to DB
+
+                record = (
+                    f"{viewed_window_info['exe_name']} - {viewed_window_info['title']}"
+                )
+                self.attention_tracker_store.save_attention(record)
 
                 self.now = datetime.now()  # Reset timer
 
