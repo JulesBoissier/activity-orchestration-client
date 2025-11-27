@@ -207,14 +207,16 @@ class ApplicationLifecycle:
             if datetime.now() - self.now > timedelta(seconds=self.period):
                 self.check_services()  # Ensure connections are alive
 
-                # Predict point of regard
+                # Capture image from webcam
                 image = self.windows_webcam_client.get_camera_input()
-                x, y = self.vision_tracking_client.predict_por(image=image)
 
                 # Determine visible windows
                 visible_windows = self.system_watchdog_client.get_visible_windows(
                     monitor=self.monitor
                 )
+
+                # Predict point of regard
+                x, y = self.vision_tracking_client.predict_por(image=image)
 
                 # Determine viewed window info
                 viewed_window_info = self._determine_viewed_window_info(
