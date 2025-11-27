@@ -207,28 +207,32 @@ class ApplicationLifecycle:
             if datetime.now() - self.now > timedelta(seconds=self.period):
                 self.check_services()  # Ensure connections are alive
 
-                # Predict point of regard
+                # Capture image from webcam
                 image = self.windows_webcam_client.get_camera_input()
-                x, y = self.vision_tracking_client.predict_por(image=image)
 
                 # Determine visible windows
                 visible_windows = self.system_watchdog_client.get_visible_windows(
                     monitor=self.monitor
                 )
 
-                # Determine viewed window info
-                viewed_window_info = self._determine_viewed_window_info(
-                    x, y, visible_windows
-                )
+                # Predict point of regard
+                x, y = self.vision_tracking_client.predict_por(image=image)
 
-                print(
-                    f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
-                )
+                if x is not None and y is not None:
+                    # Determine viewed window info
+                    viewed_window_info = self._determine_viewed_window_info(
+                        x, y, visible_windows
+                    )
 
-                record = (
-                    f"{viewed_window_info['exe_name']} - {viewed_window_info['title']}"
-                )
-                self.attention_tracker_store.save_attention(record)
+                    print(
+                        f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
+                    )
+
+                    record = f"{viewed_window_info['exe_name']} - {viewed_window_info['title']}"
+                    self.attention_tracker_store.save_attention(record)
+
+                else:
+                    print("No point of regard detected.")
 
                 self.now = datetime.now()  # Reset timer
 
