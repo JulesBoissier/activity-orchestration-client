@@ -23,5 +23,6 @@ urllib3==2.3.0
 virtualenv==20.29.1
 shapely==2.1.1
 SQLAlchemy==2.0.37
+gunicorn==21.2.0
 dash==3.2.0
 plotly==6.5.0

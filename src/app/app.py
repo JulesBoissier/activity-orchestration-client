@@ -4,7 +4,7 @@ from datetime import datetime
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, dash_table, dcc, html
 
-from src.attention_tracker_store import AttentionTracker, AttentionTrackerStore
+from src.backend.attention_tracker_store import AttentionTracker, AttentionTrackerStore
 
 
 def create_app() -> Dash:
@@ -16,7 +16,7 @@ def create_app() -> Dash:
     app.layout = html.Div(
         [
             html.H1("Attention Tracker"),
-            dcc.Interval(id="refresh", interval=5_000, n_intervals=0),
+            dcc.Interval(id="refresh", interval=2_000, n_intervals=0),
             html.Div(
                 [
                     html.H2("Recent Entries"),
@@ -105,6 +105,10 @@ def create_app() -> Dash:
     return app
 
 
+app = create_app()
+
+server = app.server
+
+
 if __name__ == "__main__":
-    app = create_app()
     app.run(debug=True)
