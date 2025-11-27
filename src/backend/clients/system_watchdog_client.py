@@ -4,7 +4,7 @@ import requests
 from shapely.geometry import MultiPolygon, Polygon, box
 from shapely.ops import unary_union
 
-from src.clients.service_client import ServiceClient
+from src.backend.clients.service_client import ServiceClient
 
 
 class SystemWatchdogClient(ServiceClient):

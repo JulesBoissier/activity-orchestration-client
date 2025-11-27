@@ -5,13 +5,13 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from tabulate import tabulate
 
-from src.attention_tracker_store import AttentionTrackerStore
-from src.clients.system_watchdog_client import SystemWatchdogClient
-from src.clients.vision_tracking_client import VisionTrackingClient
-from src.clients.windows_webcam_client import WindowsWebcamClient
-from src.screen_region import MonitorUtility
-from src.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
-from src.user_interfaces.profile_creation import ProfileCreationGUI
+from src.backend.attention_tracker_store import AttentionTrackerStore
+from src.backend.clients.system_watchdog_client import SystemWatchdogClient
+from src.backend.clients.vision_tracking_client import VisionTrackingClient
+from src.backend.clients.windows_webcam_client import WindowsWebcamClient
+from src.backend.screen_region import MonitorUtility
+from src.backend.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
+from src.backend.user_interfaces.profile_creation import ProfileCreationGUI
 
 load_dotenv()
 
