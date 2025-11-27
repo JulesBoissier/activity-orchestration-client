@@ -3,10 +3,10 @@ import random
 import numpy as np
 from screeninfo import Monitor
 
-from src.clients.vision_tracking_client import VisionTrackingClient
-from src.clients.windows_webcam_client import WindowsWebcamClient
-from src.screen_region import MonitorUtility
-from src.user_interfaces.gui_base_class import BaseGUITest
+from src.backend.clients.vision_tracking_client import VisionTrackingClient
+from src.backend.clients.windows_webcam_client import WindowsWebcamClient
+from src.backend.screen_region import MonitorUtility
+from src.backend.user_interfaces.gui_base_class import BaseGUITest
 
 
 class PerformanceMonitoringGUI(BaseGUITest):

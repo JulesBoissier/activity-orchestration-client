@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import requests
 
-from src.clients.service_client import ServiceClient
+from src.backend.clients.service_client import ServiceClient
 
 
 class VisionTrackingClient(ServiceClient):
