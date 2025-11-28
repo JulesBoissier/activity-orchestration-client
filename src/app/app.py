@@ -5,11 +5,9 @@ import dash_ag_grid as dag
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, callback, dcc, html
 
-from src.app.time_aggregation import (
-    aggregate_weighted_minutes,
-    build_buckets,
-    compute_period,
-)
+from src.app.chart_builder import build_chart
+from src.app.stats_cards import build_stats_cards
+from src.app.time_aggregation import compute_period
 from src.backend.attention_tracker_store import AttentionTracker, AttentionTrackerStore
 
 
@@ -42,6 +40,16 @@ def create_app() -> Dash:
                     ),
                 ],
                 style={"marginBottom": "8px"},
+            ),
+            html.Div(
+                id="stats-cards",
+                style={
+                    "display": "flex",
+                    "gap": "12px",
+                    "flexWrap": "wrap",
+                    "justifyContent": "center",
+                    "marginBottom": "8px",
+                },
             ),
             dcc.Graph(id="attention-graph"),
             html.Div(
@@ -108,60 +116,15 @@ def create_app() -> Dash:
         Input("period-select", "value"),
     )
     def refresh_chart(data, period_value):
-        now = datetime.now()
-        # Determine start/end and bucket step based on selected period
-        start, end, step = compute_period(now, period_value)
+        return build_chart(data, period_value)
 
-        rows = data or []
-
-        # Filter rows to selected period to avoid cross-period duration bleed
-        def _parse_ts(item):
-            try:
-                return datetime.fromisoformat(str(item.get("timestamp")))
-            except Exception:
-                return None
-
-        rows = [
-            r for r in rows if (ts := _parse_ts(r)) is not None and start <= ts <= end
-        ]
-
-        # Build bucket list per step
-        buckets = build_buckets(step, start, end)
-
-        # Aggregate weighted durations per bucket per category (minutes)
-        counts, categories = aggregate_weighted_minutes(rows, step, buckets)
-
-        # Build stacked bar series for each category
-        traces = []
-        for cat in sorted(categories):
-            y_vals = [counts[b].get(cat, 0.0) for b in buckets]
-            # Use datetime buckets on x so Plotly range tools work
-            traces.append(
-                go.Bar(
-                    name=cat,
-                    x=buckets,
-                    y=y_vals,
-                    hovertemplate=f"{cat}<br>Minutes=%{{y:.1f}}<extra></extra>",
-                )
-            )
-
-        fig = go.Figure(
-            data=traces,
-            layout=go.Layout(
-                barmode="stack",
-                margin=dict(l=40, r=140, t=20, b=40),
-                xaxis_title="Time",
-                yaxis_title="Minutes",
-            ),
-        )
-        # Preserve zoom across refreshes; no external range selector
-        fig.update_layout(
-            uirevision="attention-graph",
-            xaxis=dict(type="date"),
-            legend=dict(orientation="v", y=1, yanchor="top", x=1.02, xanchor="left"),
-        )
-
-        return fig
+    @callback(
+        Output("stats-cards", "children"),
+        Input("attention-data", "data"),
+        Input("period-select", "value"),
+    )
+    def refresh_stats(data, period_value):
+        return build_stats_cards(data, period_value)
 
     @callback(
         Output("attention-grid", "rowData"),
