@@ -3,8 +3,13 @@ from datetime import datetime, timedelta
 
 import dash_ag_grid as dag
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, dcc, html
+from dash import Dash, Input, Output, callback, dcc, html
 
+from src.app.time_aggregation import (
+    aggregate_weighted_minutes,
+    build_buckets,
+    compute_period,
+)
 from src.backend.attention_tracker_store import AttentionTracker, AttentionTrackerStore
 
 
@@ -17,7 +22,8 @@ def create_app() -> Dash:
     app.layout = html.Div(
         [
             html.H1("Attention Tracker"),
-            dcc.Interval(id="refresh", interval=5_000, n_intervals=0),
+            dcc.Interval(id="refresh", interval=1_000, n_intervals=0),
+            dcc.Store(id="attention-data"),
             html.H2("Distribution Over Time"),
             html.Div(
                 [
@@ -69,146 +75,73 @@ def create_app() -> Dash:
         style={"maxWidth": "1100px", "margin": "0 auto", "padding": "16px"},
     )
 
-    @app.callback(
-        Output("attention-grid", "rowData"),
-        Output("attention-graph", "figure"),
+    @callback(
+        Output("attention-data", "data"),
         Input("refresh", "n_intervals"),
-        Input("period-select", "value"),
     )
-    def refresh_data(_, period_value):
-        now = datetime.now()
-        # Determine start/end and bucket step based on selected period
-        if period_value == "today":
-            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            end = now
-            step = "hour"
-        elif period_value == "week":
-            start = (now - timedelta(days=now.weekday())).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-            end = now
-            step = "day"
-        elif period_value == "month":
-            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            end = now
-            step = "week"
-        else:  # "year"
-            start = now.replace(
-                month=1, day=1, hour=0, minute=0, second=0, microsecond=0
-            )
-            end = now
-            step = "month"
-
-        # Read latest data
+    def load_data(_):
         session = store.Session()
         try:
             rows = (
                 session.query(AttentionTracker)
-                .filter(AttentionTracker.timestamp >= start)
-                .filter(AttentionTracker.timestamp <= end)
                 .order_by(AttentionTracker.timestamp.desc())
                 .all()
             )
+            data = [
+                {
+                    "id": r.id,
+                    "timestamp": r.timestamp.isoformat()
+                    if isinstance(r.timestamp, datetime)
+                    else str(r.timestamp),
+                    "process_name": getattr(r, "process_name", None),
+                    "window_title": getattr(r, "window_title", None),
+                }
+                for r in rows
+            ]
         finally:
             session.close()
+        return data
 
-        # Prepare table data
-        table_data = [
-            {
-                "id": r.id,
-                "timestamp": r.timestamp.isoformat()
-                if isinstance(r.timestamp, datetime)
-                else str(r.timestamp),
-                "process_name": getattr(r, "process_name", None),
-                "window_title": getattr(r, "window_title", None),
-            }
-            for r in rows
-        ]
+    @callback(
+        Output("attention-graph", "figure"),
+        Input("attention-data", "data"),
+        Input("period-select", "value"),
+    )
+    def refresh_chart(data, period_value):
+        now = datetime.now()
+        # Determine start/end and bucket step based on selected period
+        start, end, step = compute_period(now, period_value)
 
-        # Helpers for bucketing and labels
-        def to_dt(ts):
-            if isinstance(ts, datetime):
-                return ts
+        rows = data or []
+
+        # Filter rows to selected period to avoid cross-period duration bleed
+        def _parse_ts(item):
             try:
-                return datetime.fromisoformat(str(ts))
+                return datetime.fromisoformat(str(item.get("timestamp")))
             except Exception:
                 return None
 
-        def month_iter(start_dt: datetime, end_dt: datetime):
-            cur = start_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            while cur <= end_dt:
-                yield cur
-                year = cur.year + (1 if cur.month == 12 else 0)
-                month = 1 if cur.month == 12 else cur.month + 1
-                cur = cur.replace(year=year, month=month)
-
-        def week_iter(start_dt: datetime, end_dt: datetime):
-            cur = (start_dt - timedelta(days=start_dt.weekday())).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-            while cur <= end_dt:
-                yield cur
-                cur = cur + timedelta(weeks=1)
-
-        def day_iter(start_dt: datetime, end_dt: datetime):
-            cur = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
-            while cur <= end_dt:
-                yield cur
-                cur = cur + timedelta(days=1)
-
-        def hour_iter(start_dt: datetime, end_dt: datetime):
-            cur = start_dt.replace(minute=0, second=0, microsecond=0)
-            while cur <= end_dt:
-                yield cur
-                cur = cur + timedelta(hours=1)
+        rows = [
+            r for r in rows if (ts := _parse_ts(r)) is not None and start <= ts <= end
+        ]
 
         # Build bucket list per step
-        if step == "month":
-            buckets = list(month_iter(start, end))
-        elif step == "week":
-            buckets = list(week_iter(start, end))
-        elif step == "day":
-            buckets = list(day_iter(start, end))
-        else:
-            buckets = list(hour_iter(start, end))
+        buckets = build_buckets(step, start, end)
 
-        # Aggregate counts per bucket per category (viewed_window_info)
-        counts = {b: defaultdict(int) for b in buckets}
-        categories = set()
-        for r in rows:
-            dt = to_dt(r.timestamp)
-            if not dt:
-                continue
-            # snap to bucket start
-            if step == "month":
-                snap = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            elif step == "week":
-                snap = (dt - timedelta(days=dt.weekday())).replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                )
-            elif step == "day":
-                snap = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-            else:
-                snap = dt.replace(minute=0, second=0, microsecond=0)
-            if snap not in counts:
-                # outside generated buckets (race with now) -> skip
-                continue
-            # Stack by process name for clearer legend; fallback to legacy string if missing
-            cat = getattr(r, "process_name", None) or r.viewed_window_info or "Unknown"
-            categories.add(cat)
-            counts[snap][cat] += 1
+        # Aggregate weighted durations per bucket per category (minutes)
+        counts, categories = aggregate_weighted_minutes(rows, step, buckets)
 
         # Build stacked bar series for each category
         traces = []
         for cat in sorted(categories):
-            y_vals = [counts[b].get(cat, 0) for b in buckets]
+            y_vals = [counts[b].get(cat, 0.0) for b in buckets]
             # Use datetime buckets on x so Plotly range tools work
             traces.append(
                 go.Bar(
                     name=cat,
                     x=buckets,
                     y=y_vals,
-                    hovertemplate=f"{cat}<br>Count=%{{y}}<extra></extra>",
+                    hovertemplate=f"{cat}<br>Minutes=%{{y:.1f}}<extra></extra>",
                 )
             )
 
@@ -218,7 +151,7 @@ def create_app() -> Dash:
                 barmode="stack",
                 margin=dict(l=40, r=140, t=20, b=40),
                 xaxis_title="Time",
-                yaxis_title="Entries",
+                yaxis_title="Minutes",
             ),
         )
         # Preserve zoom across refreshes; no external range selector
@@ -228,7 +161,14 @@ def create_app() -> Dash:
             legend=dict(orientation="v", y=1, yanchor="top", x=1.02, xanchor="left"),
         )
 
-        return table_data, fig
+        return fig
+
+    @callback(
+        Output("attention-grid", "rowData"),
+        Input("attention-data", "data"),
+    )
+    def refresh_grid(data):
+        return data or []
 
     return app
 
