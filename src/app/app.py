@@ -46,10 +46,8 @@ def create_app() -> Dash:
                         columnDefs=[
                             {"headerName": "ID", "field": "id", "maxWidth": 100},
                             {"headerName": "Timestamp", "field": "timestamp"},
-                            {
-                                "headerName": "Viewed Window",
-                                "field": "viewed_window_info",
-                            },
+                            {"headerName": "Process Name", "field": "process_name"},
+                            {"headerName": "Window Title", "field": "window_title"},
                         ],
                         rowData=[],
                         defaultColDef={
@@ -121,7 +119,8 @@ def create_app() -> Dash:
                 "timestamp": r.timestamp.isoformat()
                 if isinstance(r.timestamp, datetime)
                 else str(r.timestamp),
-                "viewed_window_info": r.viewed_window_info,
+                "process_name": getattr(r, "process_name", None),
+                "window_title": getattr(r, "window_title", None),
             }
             for r in rows
         ]
@@ -194,7 +193,8 @@ def create_app() -> Dash:
             if snap not in counts:
                 # outside generated buckets (race with now) -> skip
                 continue
-            cat = r.viewed_window_info
+            # Stack by process name for clearer legend; fallback to legacy string if missing
+            cat = getattr(r, "process_name", None) or r.viewed_window_info or "Unknown"
             categories.add(cat)
             counts[snap][cat] += 1
 
