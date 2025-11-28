@@ -228,13 +228,17 @@ class ApplicationLifecycle:
                         f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
                     )
 
-                    record = f"{viewed_window_info['exe_name']} - {viewed_window_info['title']}"
+                    process_name = viewed_window_info.get("exe_name", "")
+                    window_title = viewed_window_info.get("title", "")
 
                 else:
                     print("No point of regard detected.")
-                    record = "No point of regard detected."
+                    process_name = ""
+                    window_title = ""
 
-                self.attention_tracker_store.save_attention(record)
+                self.attention_tracker_store.save_attention(
+                    process_name=process_name, window_title=window_title
+                )
                 self.now = datetime.now()  # Reset timer
 
     def run(self):
