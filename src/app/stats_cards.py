@@ -53,6 +53,7 @@ def build_stats_cards(data: List[Dict[str, Any]] | None, period_value: str):
         "padding": "10px 12px",
         "minWidth": "180px",
         "background": "#fafafa",
+        "boxShadow": "0 1px 3px rgba(0,0,0,0.08)",
     }
 
     return [

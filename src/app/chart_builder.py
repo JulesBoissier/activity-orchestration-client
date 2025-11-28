@@ -50,9 +50,13 @@ def build_chart(data: List[Dict[str, Any]] | None, period_value: str) -> go.Figu
         ),
     )
     fig.update_layout(
+        template="plotly_white",
+        font=dict(size=13),
         uirevision="attention-graph",
         xaxis=dict(type="date"),
         legend=dict(orientation="v", y=1, yanchor="top", x=1.02, xanchor="left"),
     )
+    fig.update_xaxes(showgrid=True, gridcolor="#eee")
+    fig.update_yaxes(showgrid=True, gridcolor="#eee")
 
     return fig

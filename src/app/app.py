@@ -19,28 +19,38 @@ def create_app() -> Dash:
 
     app.layout = html.Div(
         [
-            html.H1("Attention Tracker"),
-            dcc.Interval(id="refresh", interval=1_000, n_intervals=0),
-            dcc.Store(id="attention-data"),
-            html.H2("Distribution Over Time"),
             html.Div(
                 [
-                    html.Label("Period"),
-                    dcc.Dropdown(
-                        id="period-select",
-                        options=[
-                            {"label": "Today", "value": "today"},
-                            {"label": "This Week", "value": "week"},
-                            {"label": "This Month", "value": "month"},
-                            {"label": "This Year", "value": "year"},
+                    html.H1("Attention Tracker", style={"margin": 0}),
+                    html.Div(
+                        [
+                            html.Label("Period", style={"marginRight": "8px"}),
+                            dcc.Dropdown(
+                                id="period-select",
+                                options=[
+                                    {"label": "Today", "value": "today"},
+                                    {"label": "This Week", "value": "week"},
+                                    {"label": "This Month", "value": "month"},
+                                    {"label": "This Year", "value": "year"},
+                                ],
+                                value="week",
+                                clearable=False,
+                                style={"width": "220px"},
+                            ),
                         ],
-                        value="week",
-                        clearable=False,
-                        style={"width": "240px"},
+                        style={"display": "flex", "alignItems": "center", "gap": "8px"},
                     ),
                 ],
-                style={"marginBottom": "8px"},
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "marginBottom": "10px",
+                },
             ),
+            dcc.Interval(id="refresh", interval=1_000, n_intervals=0),
+            dcc.Store(id="attention-data"),
+            html.H2("Distribution Over Time", style={"marginTop": "6px"}),
             html.Div(
                 id="stats-cards",
                 style={
@@ -51,36 +61,67 @@ def create_app() -> Dash:
                     "marginBottom": "8px",
                 },
             ),
-            dcc.Graph(id="attention-graph"),
+            html.Div(
+                dcc.Loading(dcc.Graph(id="attention-graph"), type="dot"),
+                style={
+                    "background": "#fff",
+                    "border": "1px solid #eee",
+                    "borderRadius": "8px",
+                    "padding": "8px",
+                },
+            ),
             html.Div(
                 [
                     html.H2("Recent Entries"),
-                    dag.AgGrid(
-                        id="attention-grid",
-                        columnDefs=[
-                            {"headerName": "ID", "field": "id", "maxWidth": 100},
-                            {"headerName": "Timestamp", "field": "timestamp"},
-                            {"headerName": "Process Name", "field": "process_name"},
-                            {"headerName": "Window Title", "field": "window_title"},
-                        ],
-                        rowData=[],
-                        defaultColDef={
-                            "resizable": True,
-                            "sortable": True,
-                            "filter": True,
-                            "floatingFilter": True,
+                    html.Div(
+                        dag.AgGrid(
+                            id="attention-grid",
+                            columnDefs=[
+                                {
+                                    "headerName": "Timestamp",
+                                    "field": "timestamp",
+                                    "width": 250,
+                                    "suppressSizeToFit": True,
+                                },
+                                {
+                                    "headerName": "Process Name",
+                                    "field": "process_name",
+                                    "width": 250,
+                                    "suppressSizeToFit": True,
+                                },
+                                {"headerName": "Window Title", "field": "window_title"},
+                            ],
+                            rowData=[],
+                            defaultColDef={
+                                "resizable": True,
+                                "sortable": True,
+                                "filter": True,
+                                "floatingFilter": True,
+                            },
+                            dashGridOptions={
+                                "rowHeight": 28,
+                                "animateRows": False,
+                                "domLayout": "autoHeight",
+                            },
+                            columnSize="sizeToFit",
+                            style={"width": "100%"},
+                        ),
+                        style={
+                            "background": "#fff",
+                            "border": "1px solid #eee",
+                            "borderRadius": "8px",
+                            "padding": "8px",
                         },
-                        dashGridOptions={
-                            "rowHeight": 28,
-                            "animateRows": False,
-                            "domLayout": "autoHeight",
-                        },
-                        style={"width": "100%"},
                     ),
                 ]
             ),
         ],
-        style={"maxWidth": "1100px", "margin": "0 auto", "padding": "16px"},
+        style={
+            "maxWidth": "1100px",
+            "margin": "0 auto",
+            "padding": "16px",
+            "background": "#f7f7fb",
+        },
     )
 
     @callback(
