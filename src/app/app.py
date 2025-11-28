@@ -1,3 +1,5 @@
+import json
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -13,6 +15,15 @@ from src.backend.attention_tracker_store import AttentionTracker, AttentionTrack
 
 def create_app() -> Dash:
     store = AttentionTrackerStore()
+    # Load readable display names for common .exe process names
+    try:
+        _mapping_path = os.path.join(
+            os.path.dirname(__file__), "metadata", "exe_display_names.json"
+        )
+        with open(_mapping_path, "r", encoding="utf-8") as _f:
+            exe_display_map = json.load(_f)
+    except Exception:
+        exe_display_map = {}
 
     app = Dash(__name__)
     app.title = "Attention Tracker"
@@ -35,6 +46,7 @@ def create_app() -> Dash:
                                 ],
                                 value="week",
                                 clearable=False,
+                                searchable=False,
                                 style={"width": "220px"},
                             ),
                         ],
@@ -152,17 +164,25 @@ def create_app() -> Dash:
                 .order_by(AttentionTracker.timestamp.desc())
                 .all()
             )
-            data = [
-                {
-                    "id": r.id,
-                    "timestamp": r.timestamp.isoformat()
-                    if isinstance(r.timestamp, datetime)
-                    else str(r.timestamp),
-                    "process_name": getattr(r, "process_name", None),
-                    "window_title": getattr(r, "window_title", None),
-                }
-                for r in rows
-            ]
+            data = []
+            for r in rows:
+                raw_proc = getattr(r, "process_name", None)
+                # Map to readable display name if available (case-insensitive)
+                mapped_proc = (
+                    exe_display_map.get(str(raw_proc).lower(), raw_proc)
+                    if raw_proc
+                    else raw_proc
+                )
+                data.append(
+                    {
+                        "id": r.id,
+                        "timestamp": r.timestamp.isoformat()
+                        if isinstance(r.timestamp, datetime)
+                        else str(r.timestamp),
+                        "process_name": mapped_proc,
+                        "window_title": getattr(r, "window_title", None),
+                    }
+                )
         finally:
             session.close()
         return data
