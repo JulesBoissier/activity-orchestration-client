@@ -40,6 +40,22 @@ def create_app() -> Dash:
                         ],
                         style={"display": "flex", "alignItems": "center", "gap": "8px"},
                     ),
+                    html.Div(
+                        [
+                            dcc.Checklist(
+                                id="threshold-2pct",
+                                options=[{"label": "2% threshold", "value": "on"}],
+                                value=[],
+                                inputStyle={"marginRight": "6px"},
+                                labelStyle={
+                                    "display": "inline-flex",
+                                    "alignItems": "center",
+                                },
+                                style={"marginTop": "2px"},
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "center"},
+                    ),
                 ],
                 style={
                     "display": "flex",
@@ -62,7 +78,7 @@ def create_app() -> Dash:
                 },
             ),
             html.Div(
-                dcc.Loading(dcc.Graph(id="attention-graph"), type="dot"),
+                dcc.Graph(id="attention-graph"),
                 style={
                     "background": "#fff",
                     "border": "1px solid #eee",
@@ -155,17 +171,23 @@ def create_app() -> Dash:
         Output("attention-graph", "figure"),
         Input("attention-data", "data"),
         Input("period-select", "value"),
+        Input("threshold-2pct", "value"),
     )
-    def refresh_chart(data, period_value):
-        return build_chart(data, period_value)
+    def refresh_chart(data, period_value, threshold_values):
+        apply_pct = bool(threshold_values and "on" in threshold_values)
+        pct = 0.02 if apply_pct else 0.0
+        return build_chart(data, period_value, apply_min_threshold=pct)
 
     @callback(
         Output("stats-cards", "children"),
         Input("attention-data", "data"),
         Input("period-select", "value"),
+        Input("threshold-2pct", "value"),
     )
-    def refresh_stats(data, period_value):
-        return build_stats_cards(data, period_value)
+    def refresh_stats(data, period_value, threshold_values):
+        apply_pct = bool(threshold_values and "on" in threshold_values)
+        pct = 0.02 if apply_pct else 0.0
+        return build_stats_cards(data, period_value, apply_min_threshold=pct)
 
     @callback(
         Output("attention-grid", "rowData"),

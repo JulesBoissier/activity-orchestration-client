@@ -10,7 +10,11 @@ from src.app.time_aggregation import (
 )
 
 
-def build_stats_cards(data: List[Dict[str, Any]] | None, period_value: str):
+def build_stats_cards(
+    data: List[Dict[str, Any]] | None,
+    period_value: str,
+    apply_min_threshold: float = 0.0,
+):
     """Builds Dash HTML stat cards for the given data and selected period."""
     now = datetime.now()
     start, end, step = compute_period(now, period_value)
@@ -33,12 +37,17 @@ def build_stats_cards(data: List[Dict[str, Any]] | None, period_value: str):
         for app_name, minutes in counts.get(b, {}).items():
             totals_by_app[app_name] = totals_by_app.get(app_name, 0.0) + minutes
 
-    total_minutes = sum(totals_by_app.values())
-    most_viewed = (
-        max(totals_by_app.items(), key=lambda kv: kv[1])[0] if totals_by_app else "—"
-    )
-    most_viewed_minutes = totals_by_app.get(most_viewed, 0.0) if totals_by_app else 0.0
-    distinct_apps = len([a for a in totals_by_app.keys() if a and a != "Unknown"])
+    # Apply percentage threshold of total time if requested
+    total_all = sum(totals_by_app.values())
+    threshold = (apply_min_threshold or 0.0) * total_all if total_all > 0 else 0.0
+    included = {
+        app: total for app, total in totals_by_app.items() if total >= threshold
+    }
+
+    total_minutes = sum(included.values())
+    most_viewed = max(included.items(), key=lambda kv: kv[1])[0] if included else "—"
+    most_viewed_minutes = included.get(most_viewed, 0.0) if included else 0.0
+    distinct_apps = len([a for a in included.keys() if a and a != "Unknown"])
 
     def fmt_minutes(m: float) -> str:
         h = int(m // 60)

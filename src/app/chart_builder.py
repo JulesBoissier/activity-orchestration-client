@@ -17,7 +17,11 @@ def _parse_ts(item: Dict[str, Any]) -> datetime | None:
         return None
 
 
-def build_chart(data: List[Dict[str, Any]] | None, period_value: str) -> go.Figure:
+def build_chart(
+    data: List[Dict[str, Any]] | None,
+    period_value: str,
+    apply_min_threshold: float = 0.0,
+) -> go.Figure:
     """Build the stacked bar chart filtered by the selected period."""
     now = datetime.now()
     start, end, step = compute_period(now, period_value)
@@ -28,8 +32,21 @@ def build_chart(data: List[Dict[str, Any]] | None, period_value: str) -> go.Figu
     buckets = build_buckets(step, start, end)
     counts, categories = aggregate_weighted_minutes(rows, step, buckets)
 
+    # Filter out apps below 2% of total minutes across selected period
+    totals_by_app: Dict[str, float] = {}
+    for b in buckets:
+        for app_name, minutes in counts.get(b, {}).items():
+            totals_by_app[app_name] = totals_by_app.get(app_name, 0.0) + minutes
+    total_minutes = sum(totals_by_app.values())
+    threshold = (
+        (apply_min_threshold or 0.0) * total_minutes if total_minutes > 0 else 0.0
+    )
+    include = {app for app, total in totals_by_app.items() if total >= threshold}
+
     traces: List[go.Bar] = []
     for cat in sorted(categories):
+        if include and cat not in include:
+            continue
         y_vals = [counts[b].get(cat, 0.0) for b in buckets]
         traces.append(
             go.Bar(
