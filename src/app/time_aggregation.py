@@ -69,7 +69,11 @@ def normalize_events(rows: List) -> List[Tuple[datetime, str]]:
                 or getattr(r, "viewed_window_info", None)
                 or "Unknown"
             )
-        events.append((dt, cat))
+        # Skip empty or unknown categories; do not include events without a process name
+        cat_str = str(cat).strip() if cat is not None else ""
+        if not cat_str or cat_str.lower() == "unknown":
+            continue
+        events.append((dt, cat_str))
     events.sort(key=lambda t: t[0])
     return events
 
