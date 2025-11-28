@@ -229,11 +229,12 @@ class ApplicationLifecycle:
                     )
 
                     record = f"{viewed_window_info['exe_name']} - {viewed_window_info['title']}"
-                    self.attention_tracker_store.save_attention(record)
 
                 else:
                     print("No point of regard detected.")
+                    record = "No point of regard detected."
 
+                self.attention_tracker_store.save_attention(record)
                 self.now = datetime.now()  # Reset timer
 
     def run(self):
