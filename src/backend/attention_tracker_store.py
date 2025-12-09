@@ -17,7 +17,8 @@ class AttentionTracker(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     timestamp = Column(DateTime, default=func.now(), onupdate=func.now(), index=True)
-    viewed_window_info = Column(String, unique=False, nullable=False, index=True)
+    process_name = Column(String, nullable=True, index=True)
+    window_title = Column(String, nullable=True, index=True)
 
 
 class AttentionTrackerStore:
@@ -28,10 +29,13 @@ class AttentionTrackerStore:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def save_attention(self, viewed_window_info: str):
-        """Save a calibration profile by name, updating it if it already exists."""
+    def save_attention(self, process_name: str, window_title: str):
+        """Insert a new attention record with normalized fields."""
         session = self.Session()
-        new_attention_tracker = AttentionTracker(viewed_window_info=viewed_window_info)
+        new_attention_tracker = AttentionTracker(
+            process_name=process_name,
+            window_title=window_title,
+        )
         session.add(new_attention_tracker)
         session.commit()
         session.close()

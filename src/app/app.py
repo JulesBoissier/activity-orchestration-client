@@ -1,106 +1,220 @@
+import json
+import os
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
+import dash_ag_grid as dag
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, dash_table, dcc, html
+from dash import Dash, Input, Output, callback, dcc, html
 
+from src.app.chart_builder import build_chart
+from src.app.stats_cards import build_stats_cards
+from src.app.time_aggregation import compute_period
 from src.backend.attention_tracker_store import AttentionTracker, AttentionTrackerStore
 
 
 def create_app() -> Dash:
     store = AttentionTrackerStore()
+    # Load readable display names for common .exe process names
+    try:
+        _mapping_path = os.path.join(
+            os.path.dirname(__file__), "metadata", "exe_display_names.json"
+        )
+        with open(_mapping_path, "r", encoding="utf-8") as _f:
+            exe_display_map = json.load(_f)
+    except Exception:
+        exe_display_map = {}
 
     app = Dash(__name__)
     app.title = "Attention Tracker"
 
     app.layout = html.Div(
         [
-            html.H1("Attention Tracker"),
-            dcc.Interval(id="refresh", interval=2_000, n_intervals=0),
+            html.Div(
+                [
+                    html.H1("Attention Tracker", style={"margin": 0}),
+                    html.Div(
+                        [
+                            html.Label("Period", style={"marginRight": "8px"}),
+                            dcc.Dropdown(
+                                id="period-select",
+                                options=[
+                                    {"label": "Today", "value": "today"},
+                                    {"label": "This Week", "value": "week"},
+                                    {"label": "This Month", "value": "month"},
+                                    {"label": "This Year", "value": "year"},
+                                ],
+                                value="week",
+                                clearable=False,
+                                searchable=False,
+                                style={"width": "220px"},
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "center", "gap": "8px"},
+                    ),
+                    html.Div(
+                        [
+                            dcc.Checklist(
+                                id="threshold-2pct",
+                                options=[{"label": "2% threshold", "value": "on"}],
+                                value=[],
+                                inputStyle={"marginRight": "6px"},
+                                labelStyle={
+                                    "display": "inline-flex",
+                                    "alignItems": "center",
+                                },
+                                style={"marginTop": "2px"},
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "center"},
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "marginBottom": "10px",
+                },
+            ),
+            dcc.Interval(id="refresh", interval=1_000, n_intervals=0),
+            dcc.Store(id="attention-data"),
+            html.H2("Distribution Over Time", style={"marginTop": "6px"}),
+            html.Div(
+                id="stats-cards",
+                style={
+                    "display": "flex",
+                    "gap": "12px",
+                    "flexWrap": "wrap",
+                    "justifyContent": "center",
+                    "marginBottom": "8px",
+                },
+            ),
+            html.Div(
+                dcc.Graph(id="attention-graph"),
+                style={
+                    "background": "#fff",
+                    "border": "1px solid #eee",
+                    "borderRadius": "8px",
+                    "padding": "8px",
+                },
+            ),
             html.Div(
                 [
                     html.H2("Recent Entries"),
-                    dash_table.DataTable(
-                        id="attention-table",
-                        columns=[
-                            {"name": "id", "id": "id"},
-                            {"name": "timestamp", "id": "timestamp"},
-                            {"name": "viewed_window_info", "id": "viewed_window_info"},
-                        ],
-                        data=[],
-                        page_size=10,
-                        sort_action="native",
-                        filter_action="native",
-                        style_table={"overflowX": "auto"},
-                        style_cell={"textAlign": "left", "padding": "6px"},
+                    html.Div(
+                        dag.AgGrid(
+                            id="attention-grid",
+                            columnDefs=[
+                                {
+                                    "headerName": "Timestamp",
+                                    "field": "timestamp",
+                                    "width": 250,
+                                    "suppressSizeToFit": True,
+                                },
+                                {
+                                    "headerName": "Process Name",
+                                    "field": "process_name",
+                                    "width": 250,
+                                    "suppressSizeToFit": True,
+                                },
+                                {"headerName": "Window Title", "field": "window_title"},
+                            ],
+                            rowData=[],
+                            defaultColDef={
+                                "resizable": True,
+                                "sortable": True,
+                                "filter": True,
+                                "floatingFilter": True,
+                            },
+                            dashGridOptions={
+                                "rowHeight": 28,
+                                "animateRows": False,
+                                "domLayout": "autoHeight",
+                            },
+                            columnSize="sizeToFit",
+                            style={"width": "100%"},
+                        ),
+                        style={
+                            "background": "#fff",
+                            "border": "1px solid #eee",
+                            "borderRadius": "8px",
+                            "padding": "8px",
+                        },
                     ),
                 ]
             ),
-            html.H2("Distribution Over Time"),
-            dcc.Graph(id="attention-graph"),
         ],
-        style={"maxWidth": "1100px", "margin": "0 auto", "padding": "16px"},
+        style={
+            "maxWidth": "1100px",
+            "margin": "0 auto",
+            "padding": "16px",
+            "background": "#f7f7fb",
+        },
     )
 
-    @app.callback(
-        Output("attention-table", "data"),
-        Output("attention-graph", "figure"),
+    @callback(
+        Output("attention-data", "data"),
         Input("refresh", "n_intervals"),
     )
-    def refresh_data(_):
-        # Read latest data
+    def load_data(_):
         session = store.Session()
         try:
             rows = (
                 session.query(AttentionTracker)
                 .order_by(AttentionTracker.timestamp.desc())
-                .limit(500)
                 .all()
             )
+            data = []
+            for r in rows:
+                raw_proc = getattr(r, "process_name", None)
+                # Map to readable display name if available (case-insensitive)
+                mapped_proc = (
+                    exe_display_map.get(str(raw_proc).lower(), raw_proc)
+                    if raw_proc
+                    else raw_proc
+                )
+                data.append(
+                    {
+                        "id": r.id,
+                        "timestamp": r.timestamp.isoformat()
+                        if isinstance(r.timestamp, datetime)
+                        else str(r.timestamp),
+                        "process_name": mapped_proc,
+                        "window_title": getattr(r, "window_title", None),
+                    }
+                )
         finally:
             session.close()
+        return data
 
-        # Prepare table data
-        table_data = [
-            {
-                "id": r.id,
-                "timestamp": r.timestamp.isoformat()
-                if isinstance(r.timestamp, datetime)
-                else str(r.timestamp),
-                "viewed_window_info": r.viewed_window_info,
-            }
-            for r in rows
-        ]
+    @callback(
+        Output("attention-graph", "figure"),
+        Input("attention-data", "data"),
+        Input("period-select", "value"),
+        Input("threshold-2pct", "value"),
+    )
+    def refresh_chart(data, period_value, threshold_values):
+        apply_pct = bool(threshold_values and "on" in threshold_values)
+        pct = 0.02 if apply_pct else 0.0
+        return build_chart(data, period_value, apply_min_threshold=pct)
 
-        # Aggregate counts by minute
-        counts_by_minute = defaultdict(int)
-        for r in rows:
-            ts = r.timestamp
-            if isinstance(ts, datetime):
-                bucket = ts.replace(second=0, microsecond=0)
-            else:
-                # Fallback parse if needed
-                try:
-                    parsed = datetime.fromisoformat(str(ts))
-                    bucket = parsed.replace(second=0, microsecond=0)
-                except Exception:
-                    continue
-            counts_by_minute[bucket] += 1
+    @callback(
+        Output("stats-cards", "children"),
+        Input("attention-data", "data"),
+        Input("period-select", "value"),
+        Input("threshold-2pct", "value"),
+    )
+    def refresh_stats(data, period_value, threshold_values):
+        apply_pct = bool(threshold_values and "on" in threshold_values)
+        pct = 0.02 if apply_pct else 0.0
+        return build_stats_cards(data, period_value, apply_min_threshold=pct)
 
-        # Sort buckets chronologically ascending for a nicer chart
-        x_vals = sorted(counts_by_minute.keys())
-        y_vals = [counts_by_minute[k] for k in x_vals]
-
-        fig = go.Figure(
-            data=[go.Bar(x=x_vals, y=y_vals, marker_color="#636EFA")],
-            layout=go.Layout(
-                margin=dict(l=40, r=20, t=20, b=40),
-                xaxis_title="Time (by minute)",
-                yaxis_title="Entries",
-            ),
-        )
-
-        return table_data, fig
+    @callback(
+        Output("attention-grid", "rowData"),
+        Input("attention-data", "data"),
+    )
+    def refresh_grid(data):
+        return data or []
 
     return app
 
