@@ -5,12 +5,13 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from tabulate import tabulate
 
-from src.clients.system_watchdog_client import SystemWatchdogClient
-from src.clients.vision_tracking_client import VisionTrackingClient
-from src.clients.windows_webcam_client import WindowsWebcamClient
-from src.screen_region import MonitorUtility
-from src.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
-from src.user_interfaces.profile_creation import ProfileCreationGUI
+from src.backend.attention_tracker_store import AttentionTrackerStore
+from src.backend.clients.system_watchdog_client import SystemWatchdogClient
+from src.backend.clients.vision_tracking_client import VisionTrackingClient
+from src.backend.clients.windows_webcam_client import WindowsWebcamClient
+from src.backend.screen_region import MonitorUtility
+from src.backend.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
+from src.backend.user_interfaces.profile_creation import ProfileCreationGUI
 
 load_dotenv()
 
@@ -114,6 +115,7 @@ class ApplicationLifecycle:
             windows_webcam_client=self.windows_webcam_client,
             monitor=self.monitor,
         )
+        self.attention_tracker_store = AttentionTrackerStore()
 
         self.now = datetime.now()
 
@@ -205,25 +207,38 @@ class ApplicationLifecycle:
             if datetime.now() - self.now > timedelta(seconds=self.period):
                 self.check_services()  # Ensure connections are alive
 
-                # Predict point of regard
+                # Capture image from webcam
                 image = self.windows_webcam_client.get_camera_input()
-                x, y = self.vision_tracking_client.predict_por(image=image)
 
                 # Determine visible windows
                 visible_windows = self.system_watchdog_client.get_visible_windows(
                     monitor=self.monitor
                 )
 
-                # Determine viewed window info
-                viewed_window_info = self._determine_viewed_window_info(
-                    x, y, visible_windows
-                )
+                # Predict point of regard
+                x, y = self.vision_tracking_client.predict_por(image=image)
 
-                print(
-                    f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
-                )
-                # TODO: Push focus info to DB
+                if x is not None and y is not None:
+                    # Determine viewed window info
+                    viewed_window_info = self._determine_viewed_window_info(
+                        x, y, visible_windows
+                    )
 
+                    print(
+                        f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
+                    )
+
+                    process_name = viewed_window_info.get("exe_name", "")
+                    window_title = viewed_window_info.get("title", "")
+
+                else:
+                    print("No point of regard detected.")
+                    process_name = ""
+                    window_title = ""
+
+                self.attention_tracker_store.save_attention(
+                    process_name=process_name, window_title=window_title
+                )
                 self.now = datetime.now()  # Reset timer
 
     def run(self):

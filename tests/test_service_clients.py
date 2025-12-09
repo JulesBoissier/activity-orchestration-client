@@ -3,9 +3,9 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from src.clients.system_watchdog_client import SystemWatchdogClient
-from src.clients.vision_tracking_client import VisionTrackingClient
-from src.clients.windows_webcam_client import WindowsWebcamClient
+from src.backend.clients.system_watchdog_client import SystemWatchdogClient
+from src.backend.clients.vision_tracking_client import VisionTrackingClient
+from src.backend.clients.windows_webcam_client import WindowsWebcamClient
 
 
 class ServiceClientTestsMixin:
@@ -17,7 +17,7 @@ class ServiceClientTestsMixin:
         assert self.CLIENT_CLASS is not None
         self.client = self.CLIENT_CLASS(self.IP, self.PORT)
 
-    @patch("src.clients.service_client.requests.get")
+    @patch("src.backend.clients.service_client.requests.get")
     def test_positive_status(self, mock_get):
         mock_get.return_value = MagicMock(status_code=200)
         self.assertTrue(self.client.get_service_status())
@@ -25,7 +25,7 @@ class ServiceClientTestsMixin:
             f"http://{self.IP}:{self.PORT}/health", timeout=1
         )
 
-    @patch("src.clients.service_client.requests.get")
+    @patch("src.backend.clients.service_client.requests.get")
     def test_negative_status_connection_error(self, mock_get):
         mock_get.side_effect = requests.ConnectionError()
         self.assertFalse(self.client.get_service_status())
@@ -33,7 +33,7 @@ class ServiceClientTestsMixin:
             f"http://{self.IP}:{self.PORT}/health", timeout=1
         )
 
-    @patch("src.clients.service_client.requests.get")
+    @patch("src.backend.clients.service_client.requests.get")
     def test_negative_status_timeout(self, mock_get):
         mock_get.side_effect = requests.Timeout()
         self.assertFalse(self.client.get_service_status())
