@@ -89,6 +89,7 @@ class MonitorUtility:
         for region in regions:
             if region.is_point_in_region(x, y):
                 return region
+        return None
 
     @staticmethod
     def create_positions_list(
