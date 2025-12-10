@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple, Union
 
 import pygame
-from screeninfo import Monitor, get_monitors
+from screeninfo import Monitor
 
 from src.backend.clients.vision_tracking_client import VisionTrackingClient
 from src.backend.clients.windows_webcam_client import WindowsWebcamClient
+from src.backend.screen_region import MonitorUtility
 
 
 class _RootAdapter:
@@ -147,7 +148,7 @@ def _parse_font(
 class BaseGUITest(ABC):
     def __init__(
         self,
-        monitor: Optional[Monitor],
+        monitor: Optional[Union[Monitor, MonitorUtility.VirtualMonitor]],
         windows_webcam_client: WindowsWebcamClient,
         vision_tracking_client: VisionTrackingClient,
     ):
@@ -163,29 +164,9 @@ class BaseGUITest(ABC):
         self.canvas: Optional[_CanvasAdapter] = None
 
     def run(self):
-        # Determine target area: single monitor or all monitors (union)
-        if self.monitor is None:
-            monitors = get_monitors()
-            min_x = min(m.x for m in monitors)
-            min_y = min(m.y for m in monitors)
-            max_x = max(m.x + m.width for m in monitors)
-            max_y = max(m.y + m.height for m in monitors)
-            win_x, win_y = int(min_x), int(min_y)
-            win_w, win_h = int(max_x - min_x), int(max_y - min_y)
-
-            # Create a simple virtual monitor-like object for adapters
-            class _VirtualMonitor:
-                def __init__(self, x, y, width, height):
-                    self.x = x
-                    self.y = y
-                    self.width = width
-                    self.height = height
-
-            target_monitor = _VirtualMonitor(win_x, win_y, win_w, win_h)
-        else:
-            target_monitor = self.monitor
-            win_x, win_y = int(self.monitor.x), int(self.monitor.y)
-            win_w, win_h = int(self.monitor.width), int(self.monitor.height)
+        # Position window and create a borderless window covering target area
+        win_x, win_y = int(self.monitor.x), int(self.monitor.y)
+        win_w, win_h = int(self.monitor.width), int(self.monitor.height)
 
         # Position window and create a borderless window covering target area
         os.environ["SDL_VIDEO_WINDOW_POS"] = f"{win_x},{win_y}"
@@ -199,7 +180,7 @@ class BaseGUITest(ABC):
         pygame.display.set_caption("Gaze Calibration")
         self._screen.fill((0, 0, 0))
 
-        self.root = _RootAdapter(target_monitor, quit_callback=self._request_quit)
+        self.root = _RootAdapter(self.monitor, quit_callback=self._request_quit)
         self.canvas = _CanvasAdapter(self._screen, background_color=(0, 0, 0))
 
         # Initial start message

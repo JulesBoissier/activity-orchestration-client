@@ -88,7 +88,7 @@ class ProfileManager:
 
 
 class ApplicationLifecycle:
-    def __init__(self, monitor_index: int = 1, period: int = 2):
+    def __init__(self, monitor_index: int = None, period: int = 2):
         """Initialize the application lifecycle with a given period (seconds)."""
         self.period = period
 
