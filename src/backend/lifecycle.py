@@ -218,23 +218,24 @@ class ApplicationLifecycle:
                 # Predict point of regard
                 x, y = self.vision_tracking_client.predict_por(image=image)
 
-                if x is not None and y is not None:
-                    # Determine viewed window info
-                    viewed_window_info = self._determine_viewed_window_info(
-                        x, y, visible_windows
-                    )
-
-                    print(
-                        f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
-                    )
-
-                    process_name = viewed_window_info.get("exe_name", "")
-                    window_title = viewed_window_info.get("title", "")
-
-                else:
+                if x is None or y is None:
                     print("No point of regard detected.")
                     process_name = ""
                     window_title = ""
+                else:
+                    viewed_window_info = self._determine_viewed_window_info(
+                        x, y, visible_windows
+                    )
+                    if viewed_window_info is None:
+                        print("No viewed window info found for the predicted point.")
+                        process_name = ""
+                        window_title = ""
+                    else:
+                        print(
+                            f"Viewed {viewed_window_info.get('exe_name', '')} - {viewed_window_info.get('title', '')}"
+                        )
+                        process_name = viewed_window_info.get("exe_name", "")
+                        window_title = viewed_window_info.get("title", "")
 
                 self.attention_tracker_store.save_attention(
                     process_name=process_name, window_title=window_title
