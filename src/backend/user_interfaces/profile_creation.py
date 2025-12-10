@@ -1,5 +1,4 @@
-from tkinter import messagebox
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from screeninfo import Monitor
 
@@ -11,7 +10,7 @@ from src.backend.user_interfaces.gui_base_class import BaseGUITest
 class ProfileCreationGUI(BaseGUITest):
     def __init__(
         self,
-        monitor: Monitor,
+        monitor: Optional[Monitor],
         positions: List[Tuple[int, int]],
         windows_webcam_client: WindowsWebcamClient,
         vision_tracking_client: VisionTrackingClient,
@@ -59,4 +58,4 @@ class ProfileCreationGUI(BaseGUITest):
             self.vision_tracking_client.add_calibration_point(
                 position[0], position[1], image
             )
-        messagebox.showinfo("Info", "Data Sent Successfully!")
+        print("Info: Data Sent Successfully!")
