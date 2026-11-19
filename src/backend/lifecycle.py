@@ -136,7 +136,7 @@ class ApplicationLifecycle:
                 self.check_services()  # Ensure connections are alive
 
                 # Capture image from webcam
-                image = self.windows_webcam_client.get_camera_input()
+                image = self.windows_webcam_client.get_camera_jpeg()
 
                 # Determine visible windows
                 visible_windows = self.system_watchdog_client.get_visible_windows(
@@ -144,7 +144,10 @@ class ApplicationLifecycle:
                 )
 
                 # Predict point of regard
-                x, y = self.vision_tracking_client.predict_por(image=image)
+                if image is None:  # the webcam service couldn't read the camera
+                    x, y = None, None
+                else:
+                    x, y = self.vision_tracking_client.predict_por(image=image)
 
                 if x is None or y is None:
                     print("No point of regard detected.")

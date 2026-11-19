@@ -46,8 +46,8 @@ class PerformanceMonitoringGUI(BaseGUITest):
             self.draw_element()
             return
 
-        image = self.windows_webcam_client.get_camera_input()
-        prediction = self.vision_tracking_client.predict_por(image)
+        image = self.windows_webcam_client.get_camera_jpeg()
+        prediction = None if image is None else self.vision_tracking_client.predict_por(image)
         self.predictions.append(prediction)
 
         if self.index < len(self.positions) - 1:

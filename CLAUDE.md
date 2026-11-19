@@ -10,9 +10,9 @@ The hub of the attention-tracking system ("Reflective Application"). It talks to
 - `src/backend/profile_manager.py` — `ProfileManager` (CLI prompts via `input()` + `tabulate`; re-prompts when the vision service answers 404 for an unknown profile id).
 - `src/backend/accuracy_scoring.py` — pure scoring for the interactive accuracy test (Euclidean error, no-prediction count, 2×2 quadrant confusion with an off-monitor column), same rules as the benchmark.
 - `src/backend/clients/` — one HTTP client per service, all subclassing `ServiceClient` (`root_url`, `get_service_status()` → `GET /health`, 1s timeout).
-  - `windows_webcam_client.py` — opens `/video_feed`, returns the first JPEG found between SOI/EOI markers as a BGR ndarray.
+  - `windows_webcam_client.py` — `get_camera_jpeg()` returns `/snapshot`'s JPEG bytes unchanged (a frame captured after the request; `None` on 503), falling back to the first JPEG of `/video_feed` on older webcam services. `get_camera_input()` decodes it to a BGR array.
   - `system_watchdog_client.py` — fetches `/windows_info` and computes visible regions with Shapely (front-to-back by `z_index`, clip to monitor, subtract already-covered area).
-  - `vision_tracking_client.py` — profile CRUD, `add_calibration_point`, `predict_por`.
+  - `vision_tracking_client.py` — profile CRUD, `add_calibration_point`, `predict_por`. Frames may be JPEG bytes (sent unchanged, the normal path) or BGR arrays (encoded).
 - `src/backend/screen_region.py` — `MonitorUtility` (monitor selection via `screeninfo`, calibration grid positions, quadrant regions).
 - `src/backend/user_interfaces/` — fullscreen GUIs (Tkinter on `main`, Pygame on `develop`): `ProfileCreationGUI` (3×3 calibration dots, frames captured on ENTER and sent in a batch at the end) and `PerformanceMonitoringGUI` (random dots → RMSE + 2×2 quadrant confusion matrix).
 - `src/backend/attention_tracker_store.py` — SQLAlchemy model `attention_tracker(id, timestamp, process_name, window_title)` in `sqlite:///attention_tracker.db`.
