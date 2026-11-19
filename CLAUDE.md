@@ -15,8 +15,8 @@ The hub of the attention-tracking system ("Reflective Application"). It talks to
   - `vision_tracking_client.py` — profile CRUD, `add_calibration_point`, `predict_por`. Frames may be JPEG bytes (sent unchanged, the normal path) or BGR arrays (encoded).
 - `src/backend/screen_region.py` — `MonitorUtility` (monitor selection via `screeninfo`, calibration grid positions, quadrant regions).
 - `src/backend/user_interfaces/` — fullscreen GUIs (Tkinter on `main`, Pygame on `develop`): `ProfileCreationGUI` (3×3 calibration dots, frames captured on ENTER and sent in a batch at the end) and `PerformanceMonitoringGUI` (random dots → RMSE + 2×2 quadrant confusion matrix).
-- `src/backend/attention_tracker_store.py` — SQLAlchemy model `attention_tracker(id, timestamp, process_name, window_title)` in `sqlite:///attention_tracker.db`.
-- `src/app/` — Dash dashboard: `app.py` (layout + callbacks; exposes `server` for gunicorn), `time_aggregation.py`, `period_iterators.py`, `chart_builder.py`, `stats_cards.py`, `metadata/exe_display_names.json`.
+- `src/backend/attention_tracker_store.py` — SQLAlchemy model `attention_tracker(id, timestamp, process_name, window_title)` in `sqlite:///attention_tracker.db`. Timestamps are **local time** (Python `datetime.now`). `PRAGMA user_version` records the schema version; opening a version-0 database (UTC timestamps from SQLite `CURRENT_TIMESTAMP`) converts it to local time once, under `BEGIN IMMEDIATE`.
+- `src/app/` — Dash dashboard: `app.py` (layout + callbacks; exposes `server` for gunicorn), `time_aggregation.py`, `period_iterators.py`, `chart_builder.py`, `stats_cards.py`, `display_names.py` + `metadata/exe_display_names.json` (case-insensitive exe → readable name).
 - `tools.py` — **stale**: imports modules that no longer exist (`src.focus_area_worker`, `src.service_clients`). Ignore or delete.
 
 ## Commands
@@ -44,14 +44,12 @@ The suite tests behaviour, not internals. Every test docstring says what is test
 
 ## How time is attributed (dashboard)
 
-Each sample is one row. Its duration = `min(60s, gap to previous sample, gap to next sample)` (`compute_event_duration_seconds`). Durations are summed per bucket (hour/day/week/month depending on period) per process. Rows with empty `process_name` (no face / no PoR) are skipped. The optional "2% threshold" hides apps under 2% of the period's total.
+Each sample is one row. Its duration = `min(60s, gap to previous sample, gap to next sample)` (`compute_event_duration_seconds`), where neighbours include gap rows. Durations are summed per bucket (hour/day/week/month depending on period) per process. Rows with empty `process_name` (no face / no PoR / no camera frame) count for no app, but still end the previous sample's time. The optional "2% threshold" hides apps under 2% of the period's total.
 
 ## Gotchas (state of `main`)
 
 - **PoR on no window** (bare desktop, or off every window) records a gap row, like "no face".
 - **Busy loop:** `monitor_focus` spins on `datetime.now()` comparisons without sleeping, so one core runs at 100%.
-- **Timezone mismatch:** `timestamp` defaults to `func.now()` → SQLite `CURRENT_TIMESTAMP` (UTC), but the dashboard filters with local `datetime.now()`. Period boundaries are off by the UTC offset.
-- **Display-name lookup lowercases the exe name**, so mixed-case keys in `exe_display_names.json` (`sourceTree.exe`, `7zFM.exe`) never match. Keep keys lowercase.
 - **Two coordinate frames:** PoR and calibration targets are monitor-relative (`screeninfo` monitor, chosen by `monitor_index`, default 1 = primary); watchdog rects are absolute Windows desktop coords. Conversion is `monitor.x + x`. If the client runs in WSLg, its `screeninfo` view of the monitors must match Windows (DPI scaling breaks this).
 - The dashboard reloads the **entire** table every second (`dcc.Interval` 1s), which gets slower as the DB grows.
 - `README` calls this module "dockerized" but there's no Dockerfile. It needs a display for Tkinter and `screeninfo`.

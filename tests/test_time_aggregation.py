@@ -92,11 +92,6 @@ def test_samples_without_a_window_are_not_counted(empty):
     assert set(totals) == {"code.exe"}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Gap rows are dropped before durations are computed, so they don't bound their "
-    "neighbours: the last sample before a gap is credited up to 60 s.",
-)
 def test_gap_rows_bound_the_previous_sample():
     """A sample followed 2 s later by a gap row counts for 2 s, not the 60 s isolated maximum.
 

@@ -1,5 +1,3 @@
-import json
-import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -8,6 +6,7 @@ import plotly.graph_objects as go
 from dash import Dash, Input, Output, callback, dcc, html
 
 from src.app.chart_builder import build_chart
+from src.app.display_names import display_name, load_display_names
 from src.app.stats_cards import build_stats_cards
 from src.app.time_aggregation import compute_period
 from src.backend.attention_tracker_store import AttentionTracker, AttentionTrackerStore
@@ -15,15 +14,7 @@ from src.backend.attention_tracker_store import AttentionTracker, AttentionTrack
 
 def create_app() -> Dash:
     store = AttentionTrackerStore()
-    # Load readable display names for common .exe process names
-    try:
-        _mapping_path = os.path.join(
-            os.path.dirname(__file__), "metadata", "exe_display_names.json"
-        )
-        with open(_mapping_path, "r", encoding="utf-8") as _f:
-            exe_display_map = json.load(_f)
-    except Exception:
-        exe_display_map = {}
+    exe_display_map = load_display_names()
 
     app = Dash(__name__)
     app.title = "Attention Tracker"
@@ -167,12 +158,7 @@ def create_app() -> Dash:
             data = []
             for r in rows:
                 raw_proc = getattr(r, "process_name", None)
-                # Map to readable display name if available (case-insensitive)
-                mapped_proc = (
-                    exe_display_map.get(str(raw_proc).lower(), raw_proc)
-                    if raw_proc
-                    else raw_proc
-                )
+                mapped_proc = display_name(raw_proc, exe_display_map)
                 data.append(
                     {
                         "id": r.id,
