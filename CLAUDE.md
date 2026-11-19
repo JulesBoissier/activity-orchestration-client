@@ -6,7 +6,8 @@ The hub of the attention-tracking system ("Reflective Application"). It talks to
 
 - `main.py` — CLI entry: `python main.py backend|app|both`.
 - `run_gunicorn.sh` — production-style launcher: gunicorn (4 workers, 127.0.0.1:8050) in the background + backend lifecycle in the foreground.
-- `src/backend/lifecycle.py` — `ApplicationLifecycle` (health checks → profile select/create → optional accuracy test → `monitor_focus()` loop) and `ProfileManager` (CLI prompts via `input()` + `tabulate`).
+- `src/backend/lifecycle.py` — `ApplicationLifecycle` (health checks → profile select/create → optional accuracy test → `monitor_focus()` loop).
+- `src/backend/profile_manager.py` — `ProfileManager` (CLI prompts via `input()` + `tabulate`).
 - `src/backend/clients/` — one HTTP client per service, all subclassing `ServiceClient` (`root_url`, `get_service_status()` → `GET /health`, 1s timeout).
   - `windows_webcam_client.py` — opens `/video_feed`, returns the first JPEG found between SOI/EOI markers as a BGR ndarray.
   - `system_watchdog_client.py` — fetches `/windows_info` and computes visible regions with Shapely (front-to-back by `z_index`, clip to monitor, subtract already-covered area).
@@ -46,7 +47,7 @@ Each sample is one row. Its duration = `min(60s, gap to previous sample, gap to 
 
 ## Gotchas (state of `main`)
 
-- **Crash when PoR is off every window:** `_determine_viewed_window_info` can return `None` and `monitor_focus` then indexes it (`viewed_window_info['exe_name']`). Fixed on `multi-monitor-support` (not yet in `develop`).
+- **PoR on no window** (bare desktop, or off every window) records a gap row, like "no face".
 - **Busy loop:** `monitor_focus` spins on `datetime.now()` comparisons without sleeping, so one core runs at 100%.
 - **Timezone mismatch:** `timestamp` defaults to `func.now()` → SQLite `CURRENT_TIMESTAMP` (UTC), but the dashboard filters with local `datetime.now()`. Period boundaries are off by the UTC offset.
 - **Display-name lookup lowercases the exe name**, so mixed-case keys in `exe_display_names.json` (`sourceTree.exe`, `7zFM.exe`) never match. Keep keys lowercase.
@@ -54,4 +55,4 @@ Each sample is one row. Its duration = `min(60s, gap to previous sample, gap to 
 - The dashboard reloads the **entire** table every second (`dcc.Interval` 1s), which gets slower as the DB grows.
 - `PerformanceMonitoringGUI` breaks if any prediction is `[None, None]` (numpy maths and region lookup).
 - `README` calls this module "dockerized" but there's no Dockerfile. It needs a display for Tkinter and `screeninfo`.
-- `develop` (and `multi-monitor-support`, which adds two commits on top) replace Tkinter with Pygame and add a `VirtualMonitor` abstraction for multi-monitor support. Check those branches before working on GUIs or `screen_region.py`.
+- GUIs use Pygame (not Tkinter) and `MonitorUtility.select_monitor(None)` returns a `VirtualMonitor` spanning all displays; calibration positions and PoR are then relative to its top-left corner.

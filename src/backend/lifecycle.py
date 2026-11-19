@@ -3,88 +3,16 @@ import time
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from tabulate import tabulate
 
 from src.backend.attention_tracker_store import AttentionTrackerStore
 from src.backend.clients.system_watchdog_client import SystemWatchdogClient
 from src.backend.clients.vision_tracking_client import VisionTrackingClient
 from src.backend.clients.windows_webcam_client import WindowsWebcamClient
+from src.backend.profile_manager import ProfileManager
 from src.backend.screen_region import MonitorUtility
 from src.backend.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
-from src.backend.user_interfaces.profile_creation import ProfileCreationGUI
 
 load_dotenv()
-
-
-class ProfileManager:
-    def __init__(self, vision_tracking_client, windows_webcam_client, monitor):
-        self.vision_tracking_client = vision_tracking_client
-        self.windows_webcam_client = windows_webcam_client
-        self.monitor = monitor
-
-    def display_profiles(self):
-        profiles = self.vision_tracking_client.list_profiles()["profiles"]
-
-        if not profiles:
-            print("No profiles found.")
-            return None
-
-        # Convert profiles into a table format
-        table = [
-            [profile["id"], profile["profile_name"], profile["updated_at"]]
-            for profile in profiles
-        ]
-        print(
-            tabulate(
-                table, headers=["ID", "Profile Name", "Last Updated"], tablefmt="grid"
-            )
-        )
-
-        return profiles  # Return the list for further use if needed
-
-    def save_profile(self):
-        """Save the current profile with the given name."""
-        choice = input("Save profile? [Y/N]: ")
-
-        if choice.lower() == "y":
-            profile_name = input("Enter a profile name: ")
-            self.vision_tracking_client.save_profile(profile_name)
-        elif choice.lower() == "n":
-            return
-        else:
-            print("Invalid input. Please enter 'Y' or 'N'.")
-            self.save_profile()
-
-    def delete_profile(self, profile_id: int):
-        self.vision_tracking_client.delete_profile(profile_id)
-
-    def reset_profile(self, profile_id: int):
-        self.vision_tracking_client.reset_profile(profile_id)
-
-    def create_new_profile(self):
-        positions = MonitorUtility.create_positions_list(self.monitor, 3)
-        pcg = ProfileCreationGUI(
-            self.monitor,
-            positions,
-            self.windows_webcam_client,
-            self.vision_tracking_client,
-        )
-        pcg.run()
-        self.save_profile()
-
-    def select_or_create_profile(self):
-        """Prompt user to select an existing profile or create a new one."""
-
-        print(
-            "Select a Profile ID from the following, or press enter to create a new profile:"
-        )
-        self.display_profiles()
-        profile_id = input()
-
-        if profile_id == "0" or not profile_id:
-            self.create_new_profile()
-        else:
-            self.vision_tracking_client.load_profile(profile_id)
 
 
 class ApplicationLifecycle:
@@ -218,23 +146,24 @@ class ApplicationLifecycle:
                 # Predict point of regard
                 x, y = self.vision_tracking_client.predict_por(image=image)
 
-                if x is not None and y is not None:
-                    # Determine viewed window info
-                    viewed_window_info = self._determine_viewed_window_info(
-                        x, y, visible_windows
-                    )
-
-                    print(
-                        f"Viewed {viewed_window_info['exe_name']} - {viewed_window_info['title']}"
-                    )
-
-                    process_name = viewed_window_info.get("exe_name", "")
-                    window_title = viewed_window_info.get("title", "")
-
-                else:
+                if x is None or y is None:
                     print("No point of regard detected.")
                     process_name = ""
                     window_title = ""
+                else:
+                    viewed_window_info = self._determine_viewed_window_info(
+                        x, y, visible_windows
+                    )
+                    if viewed_window_info is None:
+                        print("No viewed window info found for the predicted point.")
+                        process_name = ""
+                        window_title = ""
+                    else:
+                        print(
+                            f"Viewed {viewed_window_info.get('exe_name', '')} - {viewed_window_info.get('title', '')}"
+                        )
+                        process_name = viewed_window_info.get("exe_name", "")
+                        window_title = viewed_window_info.get("title", "")
 
                 self.attention_tracker_store.save_attention(
                     process_name=process_name, window_title=window_title

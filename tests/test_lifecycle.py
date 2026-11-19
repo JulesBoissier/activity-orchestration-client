@@ -98,11 +98,6 @@ def test_no_point_of_regard_records_a_gap(make_lifecycle, tracker_store):
     assert stored_rows(tracker_store) == [("", "")]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known bug on develop: _determine_viewed_window_info returns None and monitor_focus "
-    "indexes it. Fixed on multi-monitor-support (1b78d0a).",
-)
 def test_point_of_regard_outside_all_windows_records_a_gap(make_lifecycle, tracker_store):
     """A PoR that falls on no window (bare desktop, or calibration drift off-screen) stores a gap.
 
