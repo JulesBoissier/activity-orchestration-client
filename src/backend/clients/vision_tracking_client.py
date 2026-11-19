@@ -37,33 +37,31 @@ class VisionTrackingClient(ServiceClient):
         response = requests.post(url, params=params)
         return response.status_code
 
+    @staticmethod
+    def _jpeg_file(image):
+        """Multipart file entry for a frame: JPEG bytes are sent as they are, arrays are encoded.
+
+        Forwarding the webcam's JPEG unchanged avoids a decode/re-encode round trip, which
+        costs CPU and adds a second round of compression artefacts.
+        """
+        if isinstance(image, (bytes, bytearray)):
+            data = bytes(image)
+        else:
+            ok, encoded = cv2.imencode(".jpg", image)
+            if not ok:
+                raise ValueError("could not encode frame as JPEG")
+            data = encoded.tobytes()
+        return {"file": ("image.jpg", BytesIO(data), "image/jpeg")}
+
     def add_calibration_point(self, x, y, image):
+        """Send one calibration frame (JPEG bytes or a BGR array) for screen point (x, y)."""
         url = self.root_url + "/cal_point"
-
-        # Convert NumPy array to JPEG bytes
-        _, img_encoded = cv2.imencode(".jpg", image)
-        image_bytes = BytesIO(img_encoded.tobytes())  # Create file-like object
-
-        # Prepare form data and files
-        data = {"x": x, "y": y}  # Form fields
-        files = {"file": ("image.jpg", image_bytes, "image/jpeg")}  # File upload
-
-        # Send POST request
-        response = requests.post(url, data=data, files=files)
-
+        data = {"x": x, "y": y}
+        response = requests.post(url, data=data, files=self._jpeg_file(image))
         return response.status_code
 
     def predict_por(self, image):
+        """Point of regard ``[x, y]`` (or ``[None, None]``) for a frame (JPEG bytes or BGR array)."""
         url = self.root_url + "/predict"
-
-        # Convert NumPy array to JPEG bytes
-        _, img_encoded = cv2.imencode(".jpg", image)
-        image_bytes = BytesIO(img_encoded.tobytes())  # Create file-like object
-
-        # Prepare form data and files
-        files = {"file": ("image.jpg", image_bytes, "image/jpeg")}  # File upload
-
-        # Send POST request
-        response = requests.post(url, files=files)
-
+        response = requests.post(url, files=self._jpeg_file(image))
         return response.json()["prediction"]

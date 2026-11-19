@@ -111,6 +111,19 @@ def test_point_of_regard_outside_all_windows_records_a_gap(make_lifecycle, track
     assert stored_rows(tracker_store) == [("", "")]
 
 
+def test_no_camera_frame_records_a_gap(make_lifecycle, tracker_store):
+    """When the webcam service has no frame (camera unplugged or busy), a gap row is stored.
+
+    Why: a temporarily unavailable camera mustn't stop tracking or crash the loop.
+    """
+    lc = make_lifecycle(windows=[EDITOR], por=(300, 500))
+    lc.windows_webcam_client.frame = None
+
+    run_ticks(lc)
+
+    assert stored_rows(tracker_store) == [("", "")]
+
+
 def test_each_tick_stores_one_row(make_lifecycle, tracker_store):
     """Every tick stores exactly one row.
 

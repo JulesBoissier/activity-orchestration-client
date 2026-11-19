@@ -37,7 +37,10 @@ class ProfileCreationGUI(BaseGUITest):
             self.draw_element()
             return
 
-        image = self.windows_webcam_client.get_camera_input()
+        image = self.windows_webcam_client.get_camera_jpeg()
+        if image is None:  # camera unavailable: stay on this dot so ENTER can retry it
+            print("No camera frame received; press ENTER again to retry this dot.")
+            return
         self.images.append(image)
 
         if self.index < len(self.positions) - 1:
