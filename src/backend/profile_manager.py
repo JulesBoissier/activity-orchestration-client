@@ -67,9 +67,15 @@ class ProfileManager:
             "Select a Profile ID from the following, or press enter to create a new profile:"
         )
         self.display_profiles()
-        profile_id = input()
+        while True:
+            profile_id = input().strip()
 
-        if profile_id == "0" or not profile_id:
-            self.create_new_profile()
-        else:
-            self.vision_tracking_client.load_profile(profile_id)
+            if profile_id == "0" or not profile_id:
+                self.create_new_profile()
+                return
+            status = self.vision_tracking_client.load_profile(profile_id)
+            if status == 200:
+                print(f"Loaded profile {profile_id}.")
+                return
+            # 404: no such profile; 422: not a number. The service keeps its calibration.
+            print(f"No profile with ID {profile_id!r}. Enter another ID, or press enter to create one:")

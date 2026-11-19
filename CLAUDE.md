@@ -7,7 +7,8 @@ The hub of the attention-tracking system ("Reflective Application"). It talks to
 - `main.py` — CLI entry: `python main.py backend|app|both`.
 - `run_gunicorn.sh` — production-style launcher: gunicorn (4 workers, 127.0.0.1:8050) in the background + backend lifecycle in the foreground.
 - `src/backend/lifecycle.py` — `ApplicationLifecycle` (health checks → profile select/create → optional accuracy test → `monitor_focus()` loop).
-- `src/backend/profile_manager.py` — `ProfileManager` (CLI prompts via `input()` + `tabulate`).
+- `src/backend/profile_manager.py` — `ProfileManager` (CLI prompts via `input()` + `tabulate`; re-prompts when the vision service answers 404 for an unknown profile id).
+- `src/backend/accuracy_scoring.py` — pure scoring for the interactive accuracy test (Euclidean error, no-prediction count, 2×2 quadrant confusion with an off-monitor column), same rules as the benchmark.
 - `src/backend/clients/` — one HTTP client per service, all subclassing `ServiceClient` (`root_url`, `get_service_status()` → `GET /health`, 1s timeout).
   - `windows_webcam_client.py` — opens `/video_feed`, returns the first JPEG found between SOI/EOI markers as a BGR ndarray.
   - `system_watchdog_client.py` — fetches `/windows_info` and computes visible regions with Shapely (front-to-back by `z_index`, clip to monitor, subtract already-covered area).
@@ -53,6 +54,5 @@ Each sample is one row. Its duration = `min(60s, gap to previous sample, gap to 
 - **Display-name lookup lowercases the exe name**, so mixed-case keys in `exe_display_names.json` (`sourceTree.exe`, `7zFM.exe`) never match. Keep keys lowercase.
 - **Two coordinate frames:** PoR and calibration targets are monitor-relative (`screeninfo` monitor, chosen by `monitor_index`, default 1 = primary); watchdog rects are absolute Windows desktop coords. Conversion is `monitor.x + x`. If the client runs in WSLg, its `screeninfo` view of the monitors must match Windows (DPI scaling breaks this).
 - The dashboard reloads the **entire** table every second (`dcc.Interval` 1s), which gets slower as the DB grows.
-- `PerformanceMonitoringGUI` breaks if any prediction is `[None, None]` (numpy maths and region lookup).
 - `README` calls this module "dockerized" but there's no Dockerfile. It needs a display for Tkinter and `screeninfo`.
 - GUIs use Pygame (not Tkinter) and `MonitorUtility.select_monitor(None)` returns a `VirtualMonitor` spanning all displays; calibration positions and PoR are then relative to its top-left corner.
