@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 
 import numpy as np
 from screeninfo import Monitor
@@ -12,15 +13,19 @@ from src.backend.user_interfaces.gui_base_class import BaseGUITest
 class PerformanceMonitoringGUI(BaseGUITest):
     def __init__(
         self,
-        monitor: Monitor,
+        monitor: Optional[Monitor],
         nbr_of_points: int,
         windows_webcam_client: WindowsWebcamClient,
         vision_tracking_client: VisionTrackingClient,
     ):
         super().__init__(monitor, windows_webcam_client, vision_tracking_client)
+        # Use resolved monitor (Monitor or VirtualMonitor) for both positions and confusion matrix
+        area_width = int(self.monitor.width)
+        area_height = int(self.monitor.height)
+        self._confusion_monitor = self.monitor
 
         self.positions = [
-            (random.randint(0, monitor.width), random.randint(0, monitor.height))
+            (random.randint(0, area_width), random.randint(0, area_height))
             for _ in range(nbr_of_points)
         ]
         self.predictions = []
@@ -71,9 +76,8 @@ class PerformanceMonitoringGUI(BaseGUITest):
     def _calculate_confusion_matrix(self):
         # Define the four screen regions
         screen_regions = MonitorUtility.create_screen_region_list(
-            self.monitor, resolution=2
+            self._confusion_monitor, resolution=2
         )
-
         # Initialize a confusion matrix with zeros (4x4 for 4 regions)
         confusion_matrix = np.zeros(
             (len(screen_regions), len(screen_regions)), dtype=int
@@ -81,18 +85,24 @@ class PerformanceMonitoringGUI(BaseGUITest):
 
         # Map positions and predictions to their corresponding regions
         target_screen_regions = [
-            MonitorUtility.find_screen_region(position[0], position[1], self.monitor, 2)
+            MonitorUtility.find_screen_region(
+                position[0], position[1], self._confusion_monitor, 2
+            )
             for position in self.positions
         ]
 
         predict_screen_regions = [
             MonitorUtility.find_screen_region(
-                prediction[0], prediction[1], self.monitor, 2
+                prediction[0], prediction[1], self._confusion_monitor, 2
             )
             for prediction in self.predictions
         ]
 
         # Populate the confusion matrix
+        print("Target screen regions:")
+        print(target_screen_regions)
+        print("Predict screen regions:")
+        print(predict_screen_regions)
         for target, prediction in zip(target_screen_regions, predict_screen_regions):
             target_idx = screen_regions.index(target)
             prediction_idx = screen_regions.index(prediction)
