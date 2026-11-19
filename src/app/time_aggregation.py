@@ -50,7 +50,12 @@ def build_buckets(step: str, start: datetime, end: datetime) -> List[datetime]:
 
 
 def normalize_events(rows: List) -> List[Tuple[datetime, str]]:
-    """Turn ORM/dict rows into sorted (timestamp, category) pairs."""
+    """Turn ORM/dict rows into sorted (timestamp, category) pairs.
+
+    Gap rows (no process name: no face, or gaze on no window) are kept with an empty
+    category. They are never credited to an app, but their timestamps bound the durations
+    of neighbouring samples.
+    """
     events: List[Tuple[datetime, str]] = []
     for r in rows:
         ts = (
@@ -67,10 +72,7 @@ def normalize_events(rows: List) -> List[Tuple[datetime, str]]:
             cat = getattr(r, "process_name", None) or getattr(
                 r, "viewed_window_info", None
             )
-        # Skip empty categories; do not include events without a process name
         cat_str = str(cat).strip() if cat is not None else ""
-        if not cat_str:
-            continue
         events.append((dt, cat_str))
     events.sort(key=lambda t: t[0])
     return events
@@ -111,9 +113,11 @@ def aggregate_weighted_minutes(
     """
     events = normalize_events(rows)
     counts: Dict[datetime, Dict[str, float]] = {b: defaultdict(float) for b in buckets}
-    categories: Set[str] = set(cat for _, cat in events)
+    categories: Set[str] = set(cat for _, cat in events if cat)
 
     for i, (dt, cat) in enumerate(events):
+        if not cat:  # a gap: bounds its neighbours, but counts for no app
+            continue
         dur_s = compute_event_duration_seconds(events, i)
         if dur_s <= 0:
             continue
