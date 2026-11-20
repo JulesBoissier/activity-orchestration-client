@@ -133,6 +133,23 @@ class TestWebcamClient:
         assert WindowsWebcamClient(IP, 8001).get_camera_jpeg() is None
 
     @patch("src.backend.clients.windows_webcam_client.requests.get")
+    def test_burst_takes_consecutive_snapshots(self, mock_get):
+        """``get_camera_jpegs(3)`` takes three snapshots, skipping any the camera couldn't give.
+
+        Why: each ``/snapshot`` waits for the next camera frame, so the burst is three
+        consecutive frames of the same moment. A missing one shrinks the burst instead of
+        failing the tick.
+        """
+        jpeg = cv2.imencode(".jpg", _gradient())[1].tobytes()
+        answers = iter([200, 503, 200])
+        mock_get.side_effect = lambda url, *a, **k: MagicMock(status_code=next(answers), content=jpeg)
+
+        frames = WindowsWebcamClient(IP, 8001).get_camera_jpegs(3)
+
+        assert frames == [jpeg, jpeg]
+        assert mock_get.call_count == 3
+
+    @patch("src.backend.clients.windows_webcam_client.requests.get")
     def test_error_status_raises(self, mock_get):
         """Any other error status from the webcam service raises.
 
@@ -203,3 +220,59 @@ class TestVisionClient:
 
         sent = mock_post.call_args.kwargs["files"]["file"][1].read()
         assert sent == jpeg
+
+
+class TestWatchdogMonitors:
+    @patch("src.backend.clients.system_watchdog_client.requests.get")
+    def test_reads_the_monitor_layout(self, mock_get):
+        """``get_monitors`` returns each display's desktop geometry from ``/get_monitors``.
+
+        Why: monitor geometry has to come from the same place as window rects (Windows);
+        the orchestrator's own display (WSLg) can be scaled or arranged differently.
+        """
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: [
+                {"x": 0, "y": 0, "width": 2560, "height": 1440, "name": "P", "is_primary": True, "width_mm": None},
+                {"x": -1920, "y": 0, "width": 1920, "height": 1080, "name": "L", "is_primary": False},
+            ],
+        )
+
+        monitors = SystemWatchdogClient(IP, 8002).get_monitors()
+
+        assert [(m.x, m.y, m.width, m.height, m.is_primary) for m in monitors] == [
+            (0, 0, 2560, 1440, True),
+            (-1920, 0, 1920, 1080, False),
+        ]
+
+    @pytest.mark.parametrize("failure", ["404", "down"])
+    @patch("src.backend.clients.system_watchdog_client.requests.get")
+    def test_unavailable_layout_is_none(self, mock_get, failure):
+        """An older watchdog without ``/get_monitors`` (404) or an unreachable one gives ``None``.
+
+        Why: the orchestrator then falls back to its own monitor layout instead of failing.
+        """
+        if failure == "404":
+            mock_get.return_value = MagicMock(status_code=404)
+        else:
+            mock_get.side_effect = requests.ConnectionError()
+
+        assert SystemWatchdogClient(IP, 8002).get_monitors() is None
+
+
+
+@patch("src.backend.clients.vision_tracking_client.requests.post")
+def test_vision_burst_is_one_request_with_several_files(mock_post):
+    """A list of frames is sent as repeated ``file`` parts of one ``/predict`` request.
+
+    Why: the vision service combines the parts into one prediction; one request per
+    tick keeps one answer per stored row.
+    """
+    jpegs = [cv2.imencode(".jpg", TestVisionClient.FRAME)[1].tobytes()] * 3
+    mock_post.return_value = MagicMock(status_code=200, json=lambda: {"prediction": [1, 2]})
+
+    VisionTrackingClient(IP, PORT).predict_por(jpegs)
+
+    files = mock_post.call_args.kwargs["files"]
+    assert [name for name, _ in files] == ["file", "file", "file"]
+    assert all(part[1][1].read() == jpegs[0] for part in files)

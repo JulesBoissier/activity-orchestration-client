@@ -10,10 +10,11 @@ from src.app.display_names import display_name, load_display_names
 from src.app.stats_cards import build_stats_cards
 from src.app.time_aggregation import compute_period
 from src.backend.attention_tracker_store import AttentionTracker, AttentionTrackerStore
+from src.settings import Settings
 
 
 def create_app() -> Dash:
-    store = AttentionTrackerStore()
+    store = AttentionTrackerStore(Settings.from_env().activity_db_url)
     exe_display_map = load_display_names()
 
     app = Dash(__name__)
@@ -109,6 +110,12 @@ def create_app() -> Dash:
                                     "suppressSizeToFit": True,
                                 },
                                 {"headerName": "Window Title", "field": "window_title"},
+                                {
+                                    "headerName": "Gap Reason",
+                                    "field": "gap_reason",
+                                    "width": 180,
+                                    "suppressSizeToFit": True,
+                                },
                             ],
                             rowData=[],
                             defaultColDef={
@@ -167,6 +174,7 @@ def create_app() -> Dash:
                         else str(r.timestamp),
                         "process_name": mapped_proc,
                         "window_title": getattr(r, "window_title", None),
+                        "gap_reason": getattr(r, "gap_reason", None),
                     }
                 )
         finally:
