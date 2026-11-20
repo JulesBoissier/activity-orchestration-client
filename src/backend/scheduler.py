@@ -29,6 +29,7 @@ def run_every(
         raise ValueError("period_s must be positive")
     next_start = clock()
     while not stop.is_set():
+        started = clock()
         try:
             job()
         except Exception as exc:  # noqa: BLE001 - any failure of one run is survivable
@@ -36,5 +37,11 @@ def run_every(
         next_start += period_s
         now = clock()
         if next_start < now:  # overran: skip to the next slot on the grid
+            log.warning(
+                "run took %.1f s, longer than the %.1f s period; skipping to the next slot "
+                "(for tracking: lower FRAMES_PER_PREDICTION or raise TRACKING_PERIOD_S)",
+                now - started,
+                period_s,
+            )
             next_start += ((now - next_start) // period_s + 1) * period_s
         stop.wait(next_start - now)

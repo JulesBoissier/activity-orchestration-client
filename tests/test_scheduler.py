@@ -64,6 +64,18 @@ def test_runs_start_on_a_fixed_grid_whatever_they_take():
     assert starts == pytest.approx([0.0, 2.0, 4.0, 6.0])
 
 
+def test_an_overrun_is_logged(caplog):
+    """A run longer than the period logs a warning with its duration.
+
+    Why: skipped slots silently lower the sampling rate. With bursts of several frames per
+    tick, a slow machine can overrun every tick; the warning says which setting to change.
+    """
+    schedule(period=2.0, job_duration=3.0, runs=2)
+
+    assert "longer than the 2.0 s period" in caplog.text
+    assert "FRAMES_PER_PREDICTION" in caplog.text
+
+
 def test_an_overrun_skips_missed_slots_instead_of_bursting():
     """A run longer than the period delays the next run to the next free slot; no catch-up burst.
 

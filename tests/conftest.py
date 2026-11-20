@@ -60,17 +60,23 @@ class FakeWebcam:
             return None
         return cv2.imencode(".jpg", self.frame)[1].tobytes()
 
+    def get_camera_jpegs(self, count):
+        frames = [self.get_camera_jpeg() for _ in range(count)]
+        return [f for f in frames if f is not None]
+
 
 class FakeVision:
     """Returns a fixed point of regard; ``None`` coordinates mean "no face"."""
 
     def __init__(self, por=(None, None)):
         self.por = por
+        self.requests = []  # what each predict_por call received
 
     def get_service_status(self):
         return True
 
     def predict_por(self, image):
+        self.requests.append(image)
         return list(self.por)
 
 

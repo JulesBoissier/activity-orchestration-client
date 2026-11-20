@@ -174,6 +174,26 @@ def test_tracking_survives_a_failing_tick_and_stops_on_request(make_lifecycle, t
     assert stored_rows(tracker_store)[1] == ("code.exe", "main.py")
 
 
+@pytest.mark.parametrize("frames", [1, 3])
+def test_each_tick_predicts_from_one_burst(make_lifecycle, frames):
+    """A tick sends ``frames_per_prediction`` frames to the vision service in a single request.
+
+    Why: averaging a short burst of frames gives steadier predictions (benchmark: median
+    error on three monitors 295 -> 277 px). One request per tick keeps it one prediction
+    and one stored row. With 1 frame, a single JPEG is sent as before.
+    """
+    lc = make_lifecycle(windows=[EDITOR], por=(300, 500))
+    lc.tracker.frames_per_prediction = frames
+
+    lc.tracker.tick()
+
+    (sent,) = lc.vision_tracking_client.requests
+    if frames == 1:
+        assert isinstance(sent, bytes)
+    else:
+        assert isinstance(sent, list) and len(sent) == 3
+
+
 def test_each_tick_stores_one_row(make_lifecycle, tracker_store):
     """Every tick stores exactly one row.
 
