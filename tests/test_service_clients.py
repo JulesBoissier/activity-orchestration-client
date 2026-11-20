@@ -133,6 +133,23 @@ class TestWebcamClient:
         assert WindowsWebcamClient(IP, 8001).get_camera_jpeg() is None
 
     @patch("src.backend.clients.windows_webcam_client.requests.get")
+    def test_burst_takes_consecutive_snapshots(self, mock_get):
+        """``get_camera_jpegs(3)`` takes three snapshots, skipping any the camera couldn't give.
+
+        Why: each ``/snapshot`` waits for the next camera frame, so the burst is three
+        consecutive frames of the same moment. A missing one shrinks the burst instead of
+        failing the tick.
+        """
+        jpeg = cv2.imencode(".jpg", _gradient())[1].tobytes()
+        answers = iter([200, 503, 200])
+        mock_get.side_effect = lambda url, *a, **k: MagicMock(status_code=next(answers), content=jpeg)
+
+        frames = WindowsWebcamClient(IP, 8001).get_camera_jpegs(3)
+
+        assert frames == [jpeg, jpeg]
+        assert mock_get.call_count == 3
+
+    @patch("src.backend.clients.windows_webcam_client.requests.get")
     def test_error_status_raises(self, mock_get):
         """Any other error status from the webcam service raises.
 
@@ -241,3 +258,21 @@ class TestWatchdogMonitors:
             mock_get.side_effect = requests.ConnectionError()
 
         assert SystemWatchdogClient(IP, 8002).get_monitors() is None
+
+
+
+@patch("src.backend.clients.vision_tracking_client.requests.post")
+def test_vision_burst_is_one_request_with_several_files(mock_post):
+    """A list of frames is sent as repeated ``file`` parts of one ``/predict`` request.
+
+    Why: the vision service combines the parts into one prediction; one request per
+    tick keeps one answer per stored row.
+    """
+    jpegs = [cv2.imencode(".jpg", TestVisionClient.FRAME)[1].tobytes()] * 3
+    mock_post.return_value = MagicMock(status_code=200, json=lambda: {"prediction": [1, 2]})
+
+    VisionTrackingClient(IP, PORT).predict_por(jpegs)
+
+    files = mock_post.call_args.kwargs["files"]
+    assert [name for name, _ in files] == ["file", "file", "file"]
+    assert all(part[1][1].read() == jpegs[0] for part in files)

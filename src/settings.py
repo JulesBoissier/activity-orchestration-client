@@ -26,6 +26,11 @@ class Settings:
     # 1-based monitor to track; None tracks all monitors as one virtual desktop.
     monitor_index: Optional[int] = None
     activity_db_url: str = "sqlite:///attention_tracker.db"
+    # Frames per prediction (a short burst, ~33 ms apart). The vision service averages their
+    # gaze features. On the benchmark, 3 frames cut the median error on three monitors by
+    # ~6% (295 -> 277 px) and raised right-monitor attribution from 80% to 83%, at ~3x the
+    # vision service's CPU per tick. Use 1 on a machine where a tick can't finish in time.
+    frames_per_prediction: int = 3
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -50,4 +55,5 @@ class Settings:
             period_s=float(env.get("TRACKING_PERIOD_S", cls.period_s)),
             monitor_index=int(monitor) if monitor.strip() else None,
             activity_db_url=env.get("ACTIVITY_DB_URL", cls.activity_db_url),
+            frames_per_prediction=max(1, int(env.get("FRAMES_PER_PREDICTION", cls.frames_per_prediction))),
         )

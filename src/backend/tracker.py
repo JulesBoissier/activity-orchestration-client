@@ -24,7 +24,8 @@ class Tracker:
     point real clients at the benchmark's replay servers.
     """
 
-    def __init__(self, webcam, watchdog, vision, store, monitor):
+    def __init__(self, webcam, watchdog, vision, store, monitor, frames_per_prediction: int = 1):
+        self.frames_per_prediction = max(1, int(frames_per_prediction))
         self.webcam = webcam
         self.watchdog = watchdog
         self.vision = vision
@@ -33,15 +34,17 @@ class Tracker:
 
     def tick(self) -> TickResult:
         started = time.monotonic()
-        frame = self.webcam.get_camera_jpeg()
-        if frame is None:
+        frames = self.webcam.get_camera_jpegs(self.frames_per_prediction)
+        if not frames:
             # Decided here, not by attribute(): only the tick knows about the camera. No
             # point asking the watchdog or the vision service for a sample that's a gap.
             por = None
             result = Attribution(gap_reason=CAMERA_UNAVAILABLE)
         else:
             windows = self.watchdog.get_visible_windows(monitor=self.monitor)
-            por = self.vision.predict_por(frame)
+            # A burst of frames goes to the vision service in one request, which averages
+            # their gaze features: steadier than a single frame (see Settings).
+            por = self.vision.predict_por(frames if len(frames) > 1 else frames[0])
             result = attribute(por, windows, self.monitor)
 
         self.store.save_attention(

@@ -16,8 +16,10 @@ class PerformanceMonitoringGUI(BaseGUITest):
         nbr_of_points: int,
         windows_webcam_client: WindowsWebcamClient,
         vision_tracking_client: VisionTrackingClient,
+        frames_per_prediction: int = 1,
     ):
         super().__init__(monitor, windows_webcam_client, vision_tracking_client)
+        self.frames_per_prediction = max(1, int(frames_per_prediction))
         # Use resolved monitor (Monitor or VirtualMonitor) for both positions and scoring
         area_width = int(self.monitor.width)
         area_height = int(self.monitor.height)
@@ -46,8 +48,13 @@ class PerformanceMonitoringGUI(BaseGUITest):
             self.draw_element()
             return
 
-        image = self.windows_webcam_client.get_camera_jpeg()
-        prediction = None if image is None else self.vision_tracking_client.predict_por(image)
+        # Same burst as tracking, so the test measures what tracking will do.
+        frames = self.windows_webcam_client.get_camera_jpegs(self.frames_per_prediction)
+        prediction = (
+            self.vision_tracking_client.predict_por(frames if len(frames) > 1 else frames[0])
+            if frames
+            else None
+        )
         self.predictions.append(prediction)
 
         if self.index < len(self.positions) - 1:

@@ -69,6 +69,7 @@ class ApplicationLifecycle:
             vision=self.vision_tracking_client,
             store=self.attention_tracker_store,
             monitor=self.monitor,
+            frames_per_prediction=s.frames_per_prediction,
         )
         self._stop = threading.Event()
 
@@ -140,6 +141,7 @@ class ApplicationLifecycle:
             nbr_of_samples,
             self.windows_webcam_client,
             self.vision_tracking_client,
+            frames_per_prediction=self.settings.frames_per_prediction,
         )
         pmg.run()
 

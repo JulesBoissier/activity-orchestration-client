@@ -49,3 +49,14 @@ def test_tracking_options():
 
     assert (s.period_s, s.monitor_index, s.activity_db_url) == (0.5, 2, "sqlite:///x.db")
     assert Settings.from_env({"TRACKED_MONITOR_INDEX": " "}).monitor_index is None
+
+
+def test_frames_per_prediction_defaults_to_a_burst_of_three():
+    """Predictions use 3 frames by default; ``FRAMES_PER_PREDICTION`` changes it, never below 1.
+
+    Why: 3 frames measurably improved accuracy on the benchmark; machines too slow to
+    finish a 3-frame tick within the period can set 1.
+    """
+    assert Settings.from_env({}).frames_per_prediction == 3
+    assert Settings.from_env({"FRAMES_PER_PREDICTION": "1"}).frames_per_prediction == 1
+    assert Settings.from_env({"FRAMES_PER_PREDICTION": "0"}).frames_per_prediction == 1

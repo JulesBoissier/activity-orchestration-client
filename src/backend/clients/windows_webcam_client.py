@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 import cv2
 import numpy as np
@@ -24,6 +24,15 @@ class WindowsWebcamClient(ServiceClient):
         if response.status_code != 404:
             raise Exception(f"Failed to get a camera frame: {response.status_code}")
         return self._first_video_feed_frame()
+
+    def get_camera_jpegs(self, count: int) -> List[bytes]:
+        """Up to ``count`` consecutive frames (a burst); frames the camera couldn't give are skipped.
+
+        Each ``/snapshot`` waits for the next camera frame, so the frames are one frame
+        interval apart (~33 ms at 30 fps).
+        """
+        frames = (self.get_camera_jpeg() for _ in range(count))
+        return [f for f in frames if f is not None]
 
     def get_camera_input(self) -> Optional[np.ndarray]:
         """One webcam frame decoded to a BGR image, or ``None``."""
