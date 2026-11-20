@@ -8,6 +8,7 @@ from src.backend.attribution import TICK_FAILED
 from src.backend.clients.system_watchdog_client import SystemWatchdogClient
 from src.backend.clients.vision_tracking_client import VisionTrackingClient
 from src.backend.clients.windows_webcam_client import WindowsWebcamClient
+from src.backend.implicit_calibration import ClickCalibrator
 from src.backend.profile_manager import ProfileManager
 from src.backend.scheduler import run_every
 from src.backend.screen_region import MonitorUtility
@@ -70,6 +71,16 @@ class ApplicationLifecycle:
             store=self.attention_tracker_store,
             monitor=self.monitor,
             frames_per_prediction=s.frames_per_prediction,
+        )
+        self.click_calibrator = (
+            ClickCalibrator(
+                watchdog=self.system_watchdog_client,
+                webcam=self.windows_webcam_client,
+                vision=self.vision_tracking_client,
+                monitor=self.monitor,
+            )
+            if s.implicit_calibration
+            else None
         )
         self._stop = threading.Event()
 
@@ -148,6 +159,11 @@ class ApplicationLifecycle:
     def _tracking_job(self):
         self.check_services()  # blocks (retrying) while a service is down
         self.tracker.tick()
+        if self.click_calibrator is not None:
+            try:
+                self.click_calibrator.process_new_clicks()
+            except Exception:  # never let calibration from clicks cost a tracking sample
+                log.exception("implicit calibration failed for this tick")
 
     def _record_failed_tick(self, exc: Exception):
         """A tick raised: log it and record a gap, so the timeline shows tracking failed."""
@@ -160,6 +176,8 @@ class ApplicationLifecycle:
     def monitor_focus(self):
         """Track until ``stop()`` is called: one tick every ``settings.period_s`` seconds."""
         self._stop.clear()
+        if self.click_calibrator is not None:
+            self.click_calibrator.start()  # clicks before tracking starts are ignored
         run_every(self.period, self._tracking_job, self._stop, on_error=self._record_failed_tick)
 
     def stop(self):

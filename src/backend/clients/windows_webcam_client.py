@@ -34,6 +34,14 @@ class WindowsWebcamClient(ServiceClient):
         frames = (self.get_camera_jpeg() for _ in range(count))
         return [f for f in frames if f is not None]
 
+    def get_frame_at(self, t: float) -> Optional[bytes]:
+        """The recorded JPEG closest to Windows time ``t`` (``/frame_at``), or None if there's none."""
+        try:
+            response = requests.get(self.root_url + "/frame_at", params={"t": t}, timeout=5)
+        except (requests.ConnectionError, requests.Timeout):
+            return None
+        return response.content if response.status_code == 200 else None
+
     def get_camera_input(self) -> Optional[np.ndarray]:
         """One webcam frame decoded to a BGR image, or ``None``."""
         jpeg = self.get_camera_jpeg()

@@ -33,6 +33,19 @@ class SystemWatchdogClient(ServiceClient):
             for m in response.json()
         ] or None
 
+    def get_clicks(self, after: int = 0) -> Optional[Dict[str, Any]]:
+        """New left clicks from ``/clicks`` (``{recording, last_seq, clicks}``), or None if unavailable.
+
+        The first call makes the watchdog start recording clicks (opt-in).
+        """
+        try:
+            response = requests.get(
+                self.root_url + "/clicks", params={"after": after}, timeout=self.timeout * 5
+            )
+        except (requests.ConnectionError, requests.Timeout):
+            return None
+        return response.json() if response.status_code == 200 else None
+
     def get_windows_info(self):
         url = self.root_url + "/windows_info"
         response = requests.get(url)
