@@ -1,18 +1,15 @@
 import argparse
-import os
+import logging
 import shlex
-import signal
 import subprocess
-import sys
-from typing import Optional
 
 from src.app.app import app
 from src.backend.lifecycle import ApplicationLifecycle
 
 
 def run_backend():
-    lifecycle = ApplicationLifecycle(period=2)
-    lifecycle.run()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    ApplicationLifecycle().run()  # settings from the environment / .env
 
 
 def run_app_dev():
