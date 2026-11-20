@@ -7,7 +7,6 @@ so the suite runs headless, without ``screeninfo`` access to a real display.
 """
 
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -91,23 +90,37 @@ def stored_rows(store):
         session.close()
 
 
+def stored_gap_reasons(store):
+    session = store.Session()
+    try:
+        return [r.gap_reason for r in session.query(AttentionTracker).order_by(AttentionTracker.id)]
+    finally:
+        session.close()
+
+
 @pytest.fixture
 def make_lifecycle(tracker_store):
-    """Build an ``ApplicationLifecycle`` with fake services, a temp database and a given monitor."""
+    """Build an ``ApplicationLifecycle`` with fake services, a temp database and a given monitor.
+
+    Collaborators are passed to the constructor; nothing is patched. The watchdog client is
+    the real one (its clipping/occlusion is part of what a tick does) with only its HTTP
+    call replaced.
+    """
+    from src.backend.clients.system_watchdog_client import SystemWatchdogClient
     from src.backend.lifecycle import ApplicationLifecycle
+    from src.settings import Settings
 
     def build(mon=None, windows=(), por=(None, None)):
-        mon = mon or monitor()
-        with patch(
-            "src.backend.screen_region.MonitorUtility.select_monitor", return_value=mon
-        ), patch(
-            "src.backend.lifecycle.AttentionTrackerStore", return_value=tracker_store
-        ):
-            lc = ApplicationLifecycle(period=0)
-        lc.windows_webcam_client = FakeWebcam()
-        lc.vision_tracking_client = FakeVision(por)
-        lc.system_watchdog_client.get_service_status = lambda: True
-        lc.system_watchdog_client.get_windows_info = lambda: list(windows)
-        return lc
+        watchdog = SystemWatchdogClient("127.0.0.1", 8002)
+        watchdog.get_service_status = lambda: True
+        watchdog.get_windows_info = lambda: list(windows)
+        return ApplicationLifecycle(
+            Settings(period_s=0.01),
+            vision_tracking_client=FakeVision(por),
+            windows_webcam_client=FakeWebcam(),
+            system_watchdog_client=watchdog,
+            attention_tracker_store=tracker_store,
+            monitor=mon or monitor(),
+        )
 
     return build

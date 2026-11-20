@@ -1,51 +1,70 @@
-import os
+import logging
+import threading
 import time
-from datetime import datetime, timedelta
-
-from dotenv import load_dotenv
+from typing import Optional
 
 from src.backend.attention_tracker_store import AttentionTrackerStore
+from src.backend.attribution import TICK_FAILED
 from src.backend.clients.system_watchdog_client import SystemWatchdogClient
 from src.backend.clients.vision_tracking_client import VisionTrackingClient
 from src.backend.clients.windows_webcam_client import WindowsWebcamClient
 from src.backend.profile_manager import ProfileManager
+from src.backend.scheduler import run_every
 from src.backend.screen_region import MonitorUtility
+from src.backend.tracker import Tracker
 from src.backend.user_interfaces.performance_monitoring import PerformanceMonitoringGUI
+from src.settings import Settings
 
-load_dotenv()
+log = logging.getLogger(__name__)
 
 
 class ApplicationLifecycle:
-    def __init__(self, monitor_index: int = None, period: int = 2):
-        """Initialize the application lifecycle with a given period (seconds)."""
-        self.period = period
+    """Startup (health checks, profile, optional accuracy test) then periodic tracking.
 
-        # Initialize service clients
-        self.vision_tracking_client = VisionTrackingClient(
-            service_ip=os.getenv("VISION_TRACKING_SERVICE_IP", "127.0.0.1"),
-            service_port=int(os.getenv("VISION_TRACKING_SERVICE_PORT", 8000)),
-        )
-        self.windows_webcam_client = WindowsWebcamClient(
-            service_ip=os.getenv("WINDOWS_WEBCAM_SERVICE_IP", "127.0.0.1"),
-            service_port=int(os.getenv("WINDOWS_WEBCAM_SERVICE_PORT", 8001)),
-        )
+    Collaborators default to being built from ``settings``; pass them in to substitute
+    fakes (tests) or point at other services (integration runs).
+    """
 
-        self.system_watchdog_client = SystemWatchdogClient(
-            service_ip=os.getenv("SYSTEM_WATCHDOG_SERVICE_IP", "127.0.0.1"),
-            service_port=int(os.getenv("SYSTEM_WATCHDOG_SERVICE_PORT", 8002)),
+    def __init__(
+        self,
+        settings: Optional[Settings] = None,
+        *,
+        vision_tracking_client=None,
+        windows_webcam_client=None,
+        system_watchdog_client=None,
+        attention_tracker_store=None,
+        monitor=None,
+    ):
+        self.settings = settings or Settings.from_env()
+        s = self.settings
+        self.period = s.period_s
+        self.vision_tracking_client = vision_tracking_client or VisionTrackingClient(
+            s.vision.host, s.vision.port
         )
-
-        # Create screen regions
-        self.monitor = MonitorUtility.select_monitor(monitor_index)
+        self.windows_webcam_client = windows_webcam_client or WindowsWebcamClient(
+            s.webcam.host, s.webcam.port
+        )
+        self.system_watchdog_client = system_watchdog_client or SystemWatchdogClient(
+            s.watchdog.host, s.watchdog.port
+        )
+        self.attention_tracker_store = attention_tracker_store or AttentionTrackerStore(
+            s.activity_db_url
+        )
+        self.monitor = monitor or MonitorUtility.select_monitor(s.monitor_index)
 
         self.profile_manager = ProfileManager(
             vision_tracking_client=self.vision_tracking_client,
             windows_webcam_client=self.windows_webcam_client,
             monitor=self.monitor,
         )
-        self.attention_tracker_store = AttentionTrackerStore()
-
-        self.now = datetime.now()
+        self.tracker = Tracker(
+            webcam=self.windows_webcam_client,
+            watchdog=self.system_watchdog_client,
+            vision=self.vision_tracking_client,
+            store=self.attention_tracker_store,
+            monitor=self.monitor,
+        )
+        self._stop = threading.Event()
 
     def check_services(self, max_retries: int = None):
         """Ensure that both services are running before proceeding."""
@@ -91,87 +110,26 @@ class ApplicationLifecycle:
         )
         pmg.run()
 
-    def _determine_viewed_window_info(self, x, y, visible_windows):
-        """Determine which window/process is being viewed given PoR (x,y) and visible window data.
-        - x, y are expected to be monitor-relative coordinates (0..monitor.width/height).
-        - visible_windows should be a list of dicts produced by compute_visible_windows (absolute coords).
-        Returns a small dict with matched process/window info, or None if no match.
-        """
-        # Convert PoR to absolute screen coordinates
+    def _tracking_job(self):
+        self.check_services()  # blocks (retrying) while a service is down
+        self.tracker.tick()
+
+    def _record_failed_tick(self, exc: Exception):
+        """A tick raised: log it and record a gap, so the timeline shows tracking failed."""
+        log.exception("tracking tick failed", exc_info=exc)
         try:
-            abs_x = self.monitor.x + x
-            abs_y = self.monitor.y + y
+            self.attention_tracker_store.save_attention("", "", gap_reason=TICK_FAILED)
         except Exception:
-            abs_x, abs_y = x, y
-
-        def point_in_rect(px, py, rect):
-            l, t, r, b = rect
-            return (l <= px < r) and (t <= py < b)
-
-        # Be robust: ensure we check in presumed front-to-back order using z_index ascending
-        ordered = sorted(visible_windows or [], key=lambda w: w.get("z_index", 0))
-
-        for w in ordered:
-            for rect in w.get("visible_rects", []):
-                if point_in_rect(abs_x, abs_y, rect):
-                    return {
-                        "x": x,
-                        "y": y,
-                        "absolute_x": abs_x,
-                        "absolute_y": abs_y,
-                        "exe_name": w.get("exe_name") or w.get("name"),
-                        "title": w.get("title"),
-                        "z_index": w.get("z_index"),
-                        "pid": w.get("pid"),
-                        "visible_rect": rect,
-                        "visible_fraction": w.get("visible_fraction", 0.0),
-                    }
-
-        return None
+            log.exception("could not record the failed tick")
 
     def monitor_focus(self):
-        """Main loop to track and process user focus region."""
-        while True:
-            if datetime.now() - self.now > timedelta(seconds=self.period):
-                self.check_services()  # Ensure connections are alive
+        """Track until ``stop()`` is called: one tick every ``settings.period_s`` seconds."""
+        self._stop.clear()
+        run_every(self.period, self._tracking_job, self._stop, on_error=self._record_failed_tick)
 
-                # Capture image from webcam
-                image = self.windows_webcam_client.get_camera_jpeg()
-
-                # Determine visible windows
-                visible_windows = self.system_watchdog_client.get_visible_windows(
-                    monitor=self.monitor
-                )
-
-                # Predict point of regard
-                if image is None:  # the webcam service couldn't read the camera
-                    x, y = None, None
-                else:
-                    x, y = self.vision_tracking_client.predict_por(image=image)
-
-                if x is None or y is None:
-                    print("No point of regard detected.")
-                    process_name = ""
-                    window_title = ""
-                else:
-                    viewed_window_info = self._determine_viewed_window_info(
-                        x, y, visible_windows
-                    )
-                    if viewed_window_info is None:
-                        print("No viewed window info found for the predicted point.")
-                        process_name = ""
-                        window_title = ""
-                    else:
-                        print(
-                            f"Viewed {viewed_window_info.get('exe_name', '')} - {viewed_window_info.get('title', '')}"
-                        )
-                        process_name = viewed_window_info.get("exe_name", "")
-                        window_title = viewed_window_info.get("title", "")
-
-                self.attention_tracker_store.save_attention(
-                    process_name=process_name, window_title=window_title
-                )
-                self.now = datetime.now()  # Reset timer
+    def stop(self):
+        """Stop ``monitor_focus`` after the current tick."""
+        self._stop.set()
 
     def run(self):
         """Start the application lifecycle."""
@@ -181,7 +139,6 @@ class ApplicationLifecycle:
         self.monitor_focus()
 
 
-# Run the lifecycle
 if __name__ == "__main__":
-    app = ApplicationLifecycle(period=2)
-    app.run()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    ApplicationLifecycle().run()

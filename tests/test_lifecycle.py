@@ -1,41 +1,24 @@
-"""Behaviour of ``ApplicationLifecycle``: health gating and the tracking tick.
+"""Behaviour of the tracking tick and the lifecycle around it.
 
-One tracking tick gets a frame, the visible windows and a point of regard (PoR), works out
-which window the PoR falls on, and stores one row. These tests run real ticks of
-``monitor_focus`` against fake services and a temporary database and only look at what
-gets stored, so they keep passing if the loop is restructured (for example into a
-``tick()`` method), as long as the recorded result is the same.
+One tick gets a frame, the visible windows and a point of regard (PoR), works out which
+window the PoR falls on, and stores one row. These tests run real ticks (``tracker.tick()``)
+against fake services and a temporary database and look only at what gets stored.
 """
 
-from datetime import datetime
+import threading
+import time
 from unittest.mock import patch
 
 import pytest
 
-from tests.conftest import monitor, stored_rows, window
-
-
-class _StopLoop(Exception):
-    pass
+from src.backend.attribution import CAMERA_UNAVAILABLE, NO_FACE, NO_WINDOW, TICK_FAILED
+from tests.conftest import monitor, stored_gap_reasons, stored_rows, window
 
 
 def run_ticks(lc, ticks=1):
-    """Run ``monitor_focus`` for exactly ``ticks`` ticks.
-
-    The loop runs forever, so the health check, which runs at the start of every tick,
-    raises after the requested number of ticks.
-    """
-    calls = {"n": 0}
-
-    def check_services(*_, **__):
-        calls["n"] += 1
-        if calls["n"] > ticks:
-            raise _StopLoop
-
-    lc.check_services = check_services
-    lc.now = datetime.min
-    with pytest.raises(_StopLoop):
-        lc.monitor_focus()
+    """Take exactly ``ticks`` samples."""
+    for _ in range(ticks):
+        lc.tracker.tick()
 
 
 EDITOR = window("code.exe", (0, 0, 1200, 1080), z=1, title="main.py")
@@ -122,6 +105,73 @@ def test_no_camera_frame_records_a_gap(make_lifecycle, tracker_store):
     run_ticks(lc)
 
     assert stored_rows(tracker_store) == [("", "")]
+
+
+@pytest.mark.parametrize(
+    "case,expected",
+    [("camera", CAMERA_UNAVAILABLE), ("face", NO_FACE), ("window", NO_WINDOW), ("hit", None)],
+)
+def test_each_sample_records_why_it_is_a_gap(make_lifecycle, tracker_store, case, expected):
+    """Gap rows record their reason: camera unavailable, no face, or no window at the point.
+
+    Why: "the camera was broken for an hour" and "I was away for an hour" both produce empty
+    rows. The reason tells them apart. Samples on a window have no reason.
+    """
+    por = {"face": (None, None), "window": (1900, 1000)}.get(case, (300, 500))
+    lc = make_lifecycle(windows=[window("code.exe", (0, 0, 1200, 1040), z=0)], por=por)
+    if case == "camera":
+        lc.windows_webcam_client.frame = None
+
+    run_ticks(lc)
+
+    assert stored_gap_reasons(tracker_store) == [expected]
+
+
+def test_no_camera_frame_skips_the_other_services(make_lifecycle):
+    """Without a camera frame, the tick doesn't query the watchdog or the vision service.
+
+    Why: the sample is a gap whatever they answer, so the requests would be wasted every
+    tick for as long as the camera is down.
+    """
+    lc = make_lifecycle(windows=[EDITOR], por=(300, 500))
+    lc.windows_webcam_client.frame = None
+    lc.system_watchdog_client.get_windows_info = lambda: pytest.fail("watchdog queried")
+    lc.vision_tracking_client.predict_por = lambda image: pytest.fail("vision queried")
+
+    result = lc.tracker.tick()
+
+    assert result.attribution.gap_reason == CAMERA_UNAVAILABLE
+
+
+def test_tracking_survives_a_failing_tick_and_stops_on_request(make_lifecycle, tracker_store):
+    """A tick that raises is recorded as a "tick failed" gap and tracking carries on; ``stop()`` ends it.
+
+    Why: a service restarting used to raise out of the loop and end tracking until someone
+    restarted the orchestrator. Recording the failure keeps it visible on the timeline.
+    """
+    lc = make_lifecycle(windows=[EDITOR], por=(300, 500))
+    calls = {"n": 0}
+    real = lc.system_watchdog_client.get_windows_info
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ConnectionError("watchdog restarting")
+        return real()
+
+    lc.system_watchdog_client.get_windows_info = flaky
+    loop = threading.Thread(target=lc.monitor_focus)
+    loop.start()
+    deadline = time.monotonic() + 5
+    while len(stored_rows(tracker_store)) < 3 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    lc.stop()
+    loop.join(2)
+
+    assert not loop.is_alive()
+    reasons = stored_gap_reasons(tracker_store)
+    assert reasons[0] == TICK_FAILED
+    assert stored_rows(tracker_store)[1] == ("code.exe", "main.py")
 
 
 def test_each_tick_stores_one_row(make_lifecycle, tracker_store):

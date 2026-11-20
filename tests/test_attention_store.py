@@ -113,3 +113,26 @@ def test_new_database_is_not_converted(tmp_path, far_from_utc_timezone):
     before = _timestamps(store)
 
     assert _timestamps(AttentionTrackerStore(url)) == before
+
+
+def test_older_database_gains_the_gap_reason_column(tmp_path):
+    """A database from before gap reasons were recorded gets the column added, keeping its rows.
+
+    Why: existing activity history must keep working after the upgrade; old rows simply
+    have no recorded reason.
+    """
+    path = tmp_path / "attention.db"
+    _old_database(path, ["2026-11-19 08:00:00"])
+    con = sqlite3.connect(path)
+    con.execute("PRAGMA user_version = 1")  # already in local time, but no gap_reason
+    con.commit()
+    con.close()
+
+    store = AttentionTrackerStore(f"sqlite:///{path}")
+    store.save_attention("", "", gap_reason="no face")
+
+    assert stored_rows(store) == [("code.exe", "main.py"), ("", "")]
+    session = store.Session()
+    reasons = [r.gap_reason for r in session.query(AttentionTracker).order_by(AttentionTracker.id)]
+    session.close()
+    assert reasons == [None, "no face"]
