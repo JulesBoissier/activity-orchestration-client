@@ -56,14 +56,7 @@ def test_fully_covered_window_is_dropped(client):
     [
         (-32000, -32000, -31840, -31972),  # how Windows reports minimised windows
         (2000, 0, 3840, 1080),  # entirely on another monitor
-        pytest.param(
-            (1920, 0, 3840, 1080),  # maximised on the next monitor, sharing an edge
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="Known bug: a shared edge clips to a zero-area line, which is not "
-                "'empty', so the window is reported with visible_area 0.",
-            ),
-        ),
+        (1920, 0, 3840, 1080),  # maximised on the next monitor, sharing an edge
     ],
 )
 def test_windows_off_the_tracked_monitor_are_ignored(client, rect):

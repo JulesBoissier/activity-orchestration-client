@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Optional, Sequence, Union
 
 from screeninfo import Monitor, get_monitors
 
@@ -24,21 +24,27 @@ class ScreenRegion:
 class MonitorUtility:
     @dataclass
     class VirtualMonitor:
+        """The bounding box of several monitors, used to track all of them at once."""
+
         x: int
         y: int
         width: int
         height: int
+        # The real monitors it spans, so callers don't have to query the OS again.
+        monitors: tuple = ()
 
     @staticmethod
     def select_monitor(
-        display_index: Optional[int],
+        display_index: Optional[int], monitors: Optional[Sequence] = None
     ) -> Union[Monitor, "MonitorUtility.VirtualMonitor"]:
         """
         Select a monitor based on index (1 for primary, 2 for secondary, etc.)
         - If display_index is None, return a VirtualMonitor covering all displays.
+        - ``monitors`` is the monitor layout to choose from (e.g. from the watchdog's
+          ``/get_monitors``); by default this machine's ``screeninfo`` layout.
         """
 
-        monitors = get_monitors()
+        monitors = list(monitors) if monitors else get_monitors()
         num_displays = len(monitors)
 
         if display_index is None:
@@ -51,6 +57,7 @@ class MonitorUtility:
                 y=int(min_y),
                 width=int(max_x - min_x),
                 height=int(max_y - min_y),
+                monitors=tuple(monitors),
             )
 
         if display_index < 1 or display_index > num_displays:
@@ -118,7 +125,7 @@ class MonitorUtility:
                 ]
 
         if isinstance(monitor, MonitorUtility.VirtualMonitor):
-            monitors = get_monitors()
+            monitors = list(monitor.monitors) or get_monitors()
             if not monitors:
                 return []
             min_x = min(m.x for m in monitors)
