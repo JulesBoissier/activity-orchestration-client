@@ -31,6 +31,10 @@ class Settings:
     # ~6% (295 -> 277 px) and raised right-monitor attribution from 80% to 83%, at ~3x the
     # vision service's CPU per tick. Use 1 on a machine where a tick can't finish in time.
     frames_per_prediction: int = 3
+    # Implicit calibration from clicks (off by default: unproven on the benchmark so far).
+    # When on, the watchdog records clicks and each one inside the tracked area becomes a
+    # session-only calibration point in the vision service.
+    implicit_calibration: bool = False
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -56,4 +60,6 @@ class Settings:
             monitor_index=int(monitor) if monitor.strip() else None,
             activity_db_url=env.get("ACTIVITY_DB_URL", cls.activity_db_url),
             frames_per_prediction=max(1, int(env.get("FRAMES_PER_PREDICTION", cls.frames_per_prediction))),
+            implicit_calibration=env.get("IMPLICIT_CALIBRATION", "0").strip().lower()
+            in ("1", "true", "yes", "on"),
         )

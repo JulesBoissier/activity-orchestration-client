@@ -300,3 +300,20 @@ class TestMonitorLayout:
 
         assert (lc.monitor.x, lc.monitor.width) == (0, 1920)
         assert "unavailable" in caplog.text
+
+
+def test_clicks_are_never_requested_unless_implicit_calibration_is_on(make_lifecycle, tracker_store):
+    """With the default settings, tracking never asks the watchdog for clicks.
+
+    Why: the watchdog only records clicks once asked, so this keeps click recording strictly
+    opt-in (IMPLICIT_CALIBRATION=1).
+    """
+    lc = make_lifecycle(windows=[EDITOR], por=(300, 500))
+    lc.system_watchdog_client.get_clicks = lambda after=0: pytest.fail("clicks requested")
+
+    assert lc.click_calibrator is None
+    loop = threading.Thread(target=lc.monitor_focus)
+    loop.start()
+    time.sleep(0.1)
+    lc.stop()
+    loop.join(2)

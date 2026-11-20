@@ -60,3 +60,12 @@ def test_frames_per_prediction_defaults_to_a_burst_of_three():
     assert Settings.from_env({}).frames_per_prediction == 3
     assert Settings.from_env({"FRAMES_PER_PREDICTION": "1"}).frames_per_prediction == 1
     assert Settings.from_env({"FRAMES_PER_PREDICTION": "0"}).frames_per_prediction == 1
+
+
+def test_implicit_calibration_is_off_unless_enabled():
+    """Implicit calibration from clicks is off by default and enabled with IMPLICIT_CALIBRATION=1.
+
+    Why: it records clicks and its benefit is unproven on the benchmark so far.
+    """
+    assert Settings.from_env({}).implicit_calibration is False
+    assert Settings.from_env({"IMPLICIT_CALIBRATION": "1"}).implicit_calibration is True

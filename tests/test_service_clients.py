@@ -276,3 +276,48 @@ def test_vision_burst_is_one_request_with_several_files(mock_post):
     files = mock_post.call_args.kwargs["files"]
     assert [name for name, _ in files] == ["file", "file", "file"]
     assert all(part[1][1].read() == jpegs[0] for part in files)
+
+
+@patch("src.backend.clients.system_watchdog_client.requests.get")
+def test_clicks_route_and_its_absence(mock_get):
+    """``get_clicks`` returns the watchdog's answer, or None for an older watchdog (404).
+
+    Why: implicit calibration is turned off, not crashed, against watchdogs without /clicks.
+    """
+    body = {"recording": True, "last_seq": 3, "clicks": [{"seq": 3, "x": 1, "y": 2, "t": 5.0}]}
+    mock_get.return_value = MagicMock(status_code=200, json=lambda: body)
+    assert SystemWatchdogClient(IP, 8002).get_clicks(after=2) == body
+    assert mock_get.call_args.kwargs["params"] == {"after": 2}
+
+    mock_get.return_value = MagicMock(status_code=404)
+    assert SystemWatchdogClient(IP, 8002).get_clicks() is None
+
+
+@patch("src.backend.clients.windows_webcam_client.requests.get")
+def test_frame_at_returns_bytes_or_none(mock_get):
+    """``get_frame_at(t)`` returns the JPEG from that moment, or None when the webcam has none (404).
+
+    Why: a click without a frame is skipped rather than paired with the wrong image.
+    """
+    mock_get.return_value = MagicMock(status_code=200, content=b"jpeg")
+    assert WindowsWebcamClient(IP, 8001).get_frame_at(12.5) == b"jpeg"
+    assert mock_get.call_args.kwargs["params"] == {"t": 12.5}
+
+    mock_get.return_value = MagicMock(status_code=404)
+    assert WindowsWebcamClient(IP, 8001).get_frame_at(12.5) is None
+
+
+@patch("src.backend.clients.vision_tracking_client.requests.post")
+def test_implicit_calibration_point_is_marked_and_sends_the_burst(mock_post):
+    """Implicit points send ``implicit=true`` and every frame of the burst.
+
+    Why: the vision service keeps implicit points separate (per session, never saved).
+    """
+    mock_post.return_value = MagicMock(status_code=200, json=lambda: {"added": True})
+    jpeg = cv2.imencode(".jpg", TestVisionClient.FRAME)[1].tobytes()
+
+    result = VisionTrackingClient(IP, PORT).add_calibration_point(10, 20, [jpeg, jpeg], implicit=True)
+
+    assert result == {"added": True}
+    assert mock_post.call_args.kwargs["data"] == {"x": 10, "y": 20, "implicit": "true"}
+    assert len(mock_post.call_args.kwargs["files"]) == 2

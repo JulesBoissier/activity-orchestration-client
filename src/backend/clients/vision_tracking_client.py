@@ -56,12 +56,28 @@ class VisionTrackingClient(ServiceClient):
         """Multipart file entry for one frame."""
         return {"file": ("image.jpg", BytesIO(cls._jpeg_bytes(image)), "image/jpeg")}
 
-    def add_calibration_point(self, x, y, image):
-        """Send one calibration frame (JPEG bytes or a BGR array) for screen point (x, y)."""
+    def add_calibration_point(self, x, y, image, implicit: bool = False):
+        """Send a calibration frame or burst (JPEG bytes or BGR arrays) for screen point (x, y).
+
+        ``implicit=True`` marks evidence gathered during use (a click) rather than a
+        calibration dot. Returns the HTTP status for explicit points (as before) and the
+        service's answer (``{"added": ...}``) for implicit ones.
+        """
         url = self.root_url + "/cal_point"
         data = {"x": x, "y": y}
-        response = requests.post(url, data=data, files=self._jpeg_file(image))
-        return response.status_code
+        if implicit:
+            data["implicit"] = "true"
+        if isinstance(image, (list, tuple)):
+            files = [
+                ("file", (f"frame{i}.jpg", BytesIO(self._jpeg_bytes(f)), "image/jpeg"))
+                for i, f in enumerate(image)
+            ]
+        else:
+            files = self._jpeg_file(image)
+        response = requests.post(url, data=data, files=files)
+        if not implicit:
+            return response.status_code
+        return response.json() if response.status_code == 200 else {"added": False}
 
     def predict_por(self, image):
         """Point of regard ``[x, y]`` (or ``[None, None]``) for one frame or a burst.
