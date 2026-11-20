@@ -231,3 +231,52 @@ class TestHealthGate:
 
         with patch("src.backend.lifecycle.time.sleep"):
             assert lc.check_services(max_retries=5) is True
+
+
+class TestMonitorLayout:
+    """Where the lifecycle gets its monitor geometry when none is injected."""
+
+    def _lifecycle(self, watchdog_monitors, local_monitors):
+        from src.backend.clients.system_watchdog_client import SystemWatchdogClient
+        from src.backend.lifecycle import ApplicationLifecycle
+        from src.settings import Settings
+
+        watchdog = SystemWatchdogClient("127.0.0.1", 8002)
+        watchdog.get_monitors = lambda: watchdog_monitors
+        with patch("screeninfo.get_monitors", return_value=local_monitors), patch(
+            "src.backend.screen_region.get_monitors", return_value=local_monitors
+        ):
+            return ApplicationLifecycle(
+                Settings(),
+                vision_tracking_client=object(),
+                windows_webcam_client=object(),
+                system_watchdog_client=watchdog,
+                attention_tracker_store=object(),
+            )
+
+    def test_uses_the_watchdogs_layout(self, caplog):
+        """The tracked area is built from the watchdog's monitors, and a different local layout is flagged.
+
+        Why: window rects are in Windows desktop coordinates, so the monitors must be too.
+        A mismatch with this machine's display (WSLg scaling) would misplace calibration
+        dots, so it's logged rather than silently ignored.
+        """
+        windows_view = [monitor(0, 0, 2560, 1440), monitor(-1920, 0, 1920, 1080)]
+        wslg_view = [monitor(0, 0, 1707, 960)]  # scaled 150%
+
+        lc = self._lifecycle(windows_view, wslg_view)
+
+        assert (lc.monitor.x, lc.monitor.width, lc.monitor.height) == (-1920, 4480, 1440)
+        assert "differs" in caplog.text
+
+    def test_falls_back_to_the_local_layout(self, caplog):
+        """Without ``/get_monitors`` (older watchdog), this machine's layout is used, with a warning.
+
+        Why: tracking must still start against older watchdogs.
+        """
+        local = [monitor(0, 0, 1920, 1080)]
+
+        lc = self._lifecycle(None, local)
+
+        assert (lc.monitor.x, lc.monitor.width) == (0, 1920)
+        assert "unavailable" in caplog.text

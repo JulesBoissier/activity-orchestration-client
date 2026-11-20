@@ -102,3 +102,20 @@ def test_quadrant_lookup():
     assert MonitorUtility.find_screen_region(10, 10, PRIMARY, 2) == regions[0]
     assert MonitorUtility.find_screen_region(2500, 1400, PRIMARY, 2) == regions[3]
     assert MonitorUtility.find_screen_region(3000, 10, PRIMARY, 2) is None
+
+
+def test_supplied_layout_is_used_without_asking_the_os():
+    """With an explicit monitor list, selection and calibration grids never query ``screeninfo``.
+
+    Why: the orchestrator now takes the layout from the watchdog (Windows' view). Mixing in
+    this machine's view (WSLg) would put calibration dots and window rects in different
+    coordinate systems whenever the two disagree.
+    """
+    with patch("src.backend.screen_region.get_monitors", side_effect=AssertionError("queried the OS")):
+        virtual = MonitorUtility.select_monitor(None, monitors=DESK)
+        points = MonitorUtility.create_positions_list(virtual, 3)
+        second = MonitorUtility.select_monitor(2, monitors=DESK)
+
+    assert (virtual.x, virtual.width) == (-1920, 6400)
+    assert len(points) == 27
+    assert second is LEFT

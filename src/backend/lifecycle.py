@@ -18,6 +18,10 @@ from src.settings import Settings
 log = logging.getLogger(__name__)
 
 
+def _geometry(monitors):
+    return sorted((m.x, m.y, m.width, m.height) for m in monitors)
+
+
 class ApplicationLifecycle:
     """Startup (health checks, profile, optional accuracy test) then periodic tracking.
 
@@ -50,7 +54,9 @@ class ApplicationLifecycle:
         self.attention_tracker_store = attention_tracker_store or AttentionTrackerStore(
             s.activity_db_url
         )
-        self.monitor = monitor or MonitorUtility.select_monitor(s.monitor_index)
+        self.monitor = monitor or MonitorUtility.select_monitor(
+            s.monitor_index, monitors=self._monitor_layout()
+        )
 
         self.profile_manager = ProfileManager(
             vision_tracking_client=self.vision_tracking_client,
@@ -65,6 +71,33 @@ class ApplicationLifecycle:
             monitor=self.monitor,
         )
         self._stop = threading.Event()
+
+    def _monitor_layout(self):
+        """The monitors to track, as Windows sees them.
+
+        Window rects come from the watchdog in Windows desktop coordinates, so monitor
+        geometry should come from the same place. ``screeninfo`` here may see a different
+        layout (WSLg scaling, DPI). If they disagree, the calibration GUI, which draws with
+        this machine's display, may put dots in the wrong place: that's worth a warning.
+        """
+        remote = self.system_watchdog_client.get_monitors()
+        try:
+            from screeninfo import get_monitors
+
+            local = get_monitors()
+        except Exception:  # no display here (headless, CI)
+            local = None
+        if remote is None:
+            log.warning("watchdog /get_monitors unavailable; using this machine's monitor layout")
+            return local
+        if local is not None and _geometry(local) != _geometry(remote):
+            log.warning(
+                "monitor layout differs between Windows %s and this display %s; using Windows'. "
+                "Calibration dots may be misplaced (check display scaling).",
+                _geometry(remote),
+                _geometry(local),
+            )
+        return remote
 
     def check_services(self, max_retries: int = None):
         """Ensure that both services are running before proceeding."""

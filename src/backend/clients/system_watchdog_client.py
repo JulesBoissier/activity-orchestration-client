@@ -1,4 +1,5 @@
-from typing import Any, Dict, List
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional
 
 import requests
 from shapely.geometry import MultiPolygon, Polygon, box
@@ -8,6 +9,30 @@ from src.backend.clients.service_client import ServiceClient
 
 
 class SystemWatchdogClient(ServiceClient):
+    def get_monitors(self) -> Optional[List[SimpleNamespace]]:
+        """The monitor layout as Windows reports it (``/get_monitors``), or ``None`` if unavailable.
+
+        Same coordinate system as ``/windows_info`` rects, which is why the orchestrator
+        prefers it over its own ``screeninfo`` view (WSLg can scale or reorder monitors).
+        """
+        try:
+            response = requests.get(self.root_url + "/get_monitors", timeout=self.timeout * 5)
+        except (requests.ConnectionError, requests.Timeout):
+            return None
+        if response.status_code != 200:
+            return None
+        return [
+            SimpleNamespace(
+                x=int(m["x"]),
+                y=int(m["y"]),
+                width=int(m["width"]),
+                height=int(m["height"]),
+                name=m.get("name") or "",
+                is_primary=bool(m.get("is_primary")),
+            )
+            for m in response.json()
+        ] or None
+
     def get_windows_info(self):
         url = self.root_url + "/windows_info"
         response = requests.get(url)
@@ -102,7 +127,8 @@ class SystemWatchdogClient(ServiceClient):
             clipped = window_geom.intersection(monitor_box)
 
             # Ignore minimized/off-screen windows (e.g., -32000 coords) or those not intersecting the monitor
-            if clipped.is_empty:
+            # A shared edge clips to a zero-area line, which isn't "empty"
+            if clipped.is_empty or clipped.area == 0:
                 continue
 
             visible = clipped if covered is None else clipped.difference(covered)
@@ -111,7 +137,7 @@ class SystemWatchdogClient(ServiceClient):
             covered = clipped if covered is None else unary_union([covered, clipped])
 
             # Only keep windows with some visible area
-            if not visible.is_empty:
+            if not visible.is_empty and visible.area > 0:
                 window_area = clipped.area
                 visible_area = visible.area
                 results.append(

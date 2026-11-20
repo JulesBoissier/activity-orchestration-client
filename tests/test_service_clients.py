@@ -203,3 +203,41 @@ class TestVisionClient:
 
         sent = mock_post.call_args.kwargs["files"]["file"][1].read()
         assert sent == jpeg
+
+
+class TestWatchdogMonitors:
+    @patch("src.backend.clients.system_watchdog_client.requests.get")
+    def test_reads_the_monitor_layout(self, mock_get):
+        """``get_monitors`` returns each display's desktop geometry from ``/get_monitors``.
+
+        Why: monitor geometry has to come from the same place as window rects (Windows);
+        the orchestrator's own display (WSLg) can be scaled or arranged differently.
+        """
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: [
+                {"x": 0, "y": 0, "width": 2560, "height": 1440, "name": "P", "is_primary": True, "width_mm": None},
+                {"x": -1920, "y": 0, "width": 1920, "height": 1080, "name": "L", "is_primary": False},
+            ],
+        )
+
+        monitors = SystemWatchdogClient(IP, 8002).get_monitors()
+
+        assert [(m.x, m.y, m.width, m.height, m.is_primary) for m in monitors] == [
+            (0, 0, 2560, 1440, True),
+            (-1920, 0, 1920, 1080, False),
+        ]
+
+    @pytest.mark.parametrize("failure", ["404", "down"])
+    @patch("src.backend.clients.system_watchdog_client.requests.get")
+    def test_unavailable_layout_is_none(self, mock_get, failure):
+        """An older watchdog without ``/get_monitors`` (404) or an unreachable one gives ``None``.
+
+        Why: the orchestrator then falls back to its own monitor layout instead of failing.
+        """
+        if failure == "404":
+            mock_get.return_value = MagicMock(status_code=404)
+        else:
+            mock_get.side_effect = requests.ConnectionError()
+
+        assert SystemWatchdogClient(IP, 8002).get_monitors() is None

@@ -53,7 +53,7 @@ Each sample is one row. Its duration = `min(60s, gap to previous sample, gap to 
 ## Gotchas (state of `main`)
 
 - **PoR on no window** (bare desktop, or off every window) records a gap row, like "no face".
-- **Two coordinate frames:** PoR and calibration targets are monitor-relative (`screeninfo` monitor, chosen by `monitor_index`, default 1 = primary); watchdog rects are absolute Windows desktop coords. Conversion is `monitor.x + x`. If the client runs in WSLg, its `screeninfo` view of the monitors must match Windows (DPI scaling breaks this).
+- **Two coordinate frames:** PoR and calibration targets are relative to the tracked monitor (or `VirtualMonitor`); watchdog rects are absolute Windows desktop coords. Conversion is `monitor.x + x`. Monitor geometry comes from the watchdog's `/get_monitors` (Windows' view, same coordinates as the rects), falling back to local `screeninfo`. The calibration GUI still draws on this machine's display: if WSLg's layout differs from Windows' (scaling), the lifecycle logs a warning and dots may be misplaced.
 - The dashboard reloads the **entire** table every second (`dcc.Interval` 1s), which gets slower as the DB grows.
 - `README` calls this module "dockerized" but there's no Dockerfile. It needs a display for Tkinter and `screeninfo`.
 - GUIs use Pygame (not Tkinter) and `MonitorUtility.select_monitor(None)` returns a `VirtualMonitor` spanning all displays; calibration positions and PoR are then relative to its top-left corner.
