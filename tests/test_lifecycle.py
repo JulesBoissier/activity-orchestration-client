@@ -98,11 +98,6 @@ def test_no_point_of_regard_records_a_gap(make_lifecycle, tracker_store):
     assert stored_rows(tracker_store) == [("", "")]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known bug on develop: _determine_viewed_window_info returns None and monitor_focus "
-    "indexes it. Fixed on multi-monitor-support (1b78d0a).",
-)
 def test_point_of_regard_outside_all_windows_records_a_gap(make_lifecycle, tracker_store):
     """A PoR that falls on no window (bare desktop, or calibration drift off-screen) stores a gap.
 
@@ -110,6 +105,19 @@ def test_point_of_regard_outside_all_windows_records_a_gap(make_lifecycle, track
     unlucky prediction shouldn't stop tracking.
     """
     lc = make_lifecycle(windows=[window("code.exe", (0, 0, 100, 100), z=0)], por=(900, 900))
+
+    run_ticks(lc)
+
+    assert stored_rows(tracker_store) == [("", "")]
+
+
+def test_no_camera_frame_records_a_gap(make_lifecycle, tracker_store):
+    """When the webcam service has no frame (camera unplugged or busy), a gap row is stored.
+
+    Why: a temporarily unavailable camera mustn't stop tracking or crash the loop.
+    """
+    lc = make_lifecycle(windows=[EDITOR], por=(300, 500))
+    lc.windows_webcam_client.frame = None
 
     run_ticks(lc)
 

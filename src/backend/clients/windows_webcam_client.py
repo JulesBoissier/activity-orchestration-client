@@ -1,34 +1,47 @@
+from typing import Optional
+
 import cv2
 import numpy as np
 import requests
 
 from src.backend.clients.service_client import ServiceClient
 
+SOI, EOI = b"\xff\xd8", b"\xff\xd9"
+
 
 class WindowsWebcamClient(ServiceClient):
-    def get_camera_input(self):
-        # Connect to the video stream
+    def get_camera_jpeg(self) -> Optional[bytes]:
+        """One webcam frame as the JPEG bytes the service sent, or ``None`` if there is none.
+
+        Uses ``/snapshot`` (a frame captured after the request). Falls back to the first frame
+        of ``/video_feed`` for webcam services that predate ``/snapshot``.
+        """
+        response = requests.get(self.root_url + "/snapshot", timeout=5)
+        if response.status_code == 200:
+            return response.content
+        if response.status_code == 503:  # the service is up but can't read the camera
+            return None
+        if response.status_code != 404:
+            raise Exception(f"Failed to get a camera frame: {response.status_code}")
+        return self._first_video_feed_frame()
+
+    def get_camera_input(self) -> Optional[np.ndarray]:
+        """One webcam frame decoded to a BGR image, or ``None``."""
+        jpeg = self.get_camera_jpeg()
+        if jpeg is None:
+            return None
+        return cv2.imdecode(np.frombuffer(jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+    def _first_video_feed_frame(self) -> Optional[bytes]:
         response = requests.get(self.root_url + "/video_feed", stream=True, timeout=5)
         if response.status_code != 200:
             raise Exception(f"Failed to connect to camera feed: {response.status_code}")
 
-        # Read from the stream
         byte_stream = b""
         for chunk in response.iter_content(chunk_size=1024):
             byte_stream += chunk
-            # Look for the JPEG frame boundary
-            start = byte_stream.find(b"\xff\xd8")  # Start of JPEG
-            end = byte_stream.find(b"\xff\xd9")  # End of JPEG
-
+            start = byte_stream.find(SOI)
+            end = byte_stream.find(EOI, start + 2) if start != -1 else -1
             if start != -1 and end != -1:
-                jpg_data = byte_stream[start : end + 2]  # Extract frame
-                byte_stream = byte_stream[end + 2 :]  # Remove processed frame
-
-                # Convert to OpenCV image
-                image = cv2.imdecode(
-                    np.frombuffer(jpg_data, dtype=np.uint8), cv2.IMREAD_COLOR
-                )
-
-                return image  # Return single frame as an OpenCV image
-
-        return None  # Return None if no frame is found
+                return byte_stream[start : end + 2]
+        return None

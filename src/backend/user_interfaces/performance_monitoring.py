@@ -1,12 +1,11 @@
 import random
 from typing import Optional
 
-import numpy as np
 from screeninfo import Monitor
 
 from src.backend.clients.vision_tracking_client import VisionTrackingClient
 from src.backend.clients.windows_webcam_client import WindowsWebcamClient
-from src.backend.screen_region import MonitorUtility
+from src.backend.accuracy_scoring import score_accuracy_test
 from src.backend.user_interfaces.gui_base_class import BaseGUITest
 
 
@@ -19,13 +18,12 @@ class PerformanceMonitoringGUI(BaseGUITest):
         vision_tracking_client: VisionTrackingClient,
     ):
         super().__init__(monitor, windows_webcam_client, vision_tracking_client)
-        # Use resolved monitor (Monitor or VirtualMonitor) for both positions and confusion matrix
+        # Use resolved monitor (Monitor or VirtualMonitor) for both positions and scoring
         area_width = int(self.monitor.width)
         area_height = int(self.monitor.height)
-        self._confusion_monitor = self.monitor
 
         self.positions = [
-            (random.randint(0, area_width), random.randint(0, area_height))
+            (random.randint(0, area_width - 1), random.randint(0, area_height - 1))
             for _ in range(nbr_of_points)
         ]
         self.predictions = []
@@ -48,8 +46,8 @@ class PerformanceMonitoringGUI(BaseGUITest):
             self.draw_element()
             return
 
-        image = self.windows_webcam_client.get_camera_input()
-        prediction = self.vision_tracking_client.predict_por(image)
+        image = self.windows_webcam_client.get_camera_jpeg()
+        prediction = None if image is None else self.vision_tracking_client.predict_por(image)
         self.predictions.append(prediction)
 
         if self.index < len(self.positions) - 1:
@@ -65,70 +63,20 @@ class PerformanceMonitoringGUI(BaseGUITest):
             self.index -= 1
             self.draw_element()
 
-    def _calculate_rmse(self):
-        if len(self.predictions) == len(self.positions):
-            errors = np.array(self.predictions) - np.array(self.positions)
-            rmse = np.sqrt(np.mean(errors**2))
-            return rmse
-        else:
-            return None
-
-    def _calculate_confusion_matrix(self):
-        # Define the four screen regions
-        screen_regions = MonitorUtility.create_screen_region_list(
-            self._confusion_monitor, resolution=2
-        )
-        # Initialize a confusion matrix with zeros (4x4 for 4 regions)
-        confusion_matrix = np.zeros(
-            (len(screen_regions), len(screen_regions)), dtype=int
-        )
-
-        # Map positions and predictions to their corresponding regions
-        target_screen_regions = [
-            MonitorUtility.find_screen_region(
-                position[0], position[1], self._confusion_monitor, 2
-            )
-            for position in self.positions
-        ]
-
-        predict_screen_regions = [
-            MonitorUtility.find_screen_region(
-                prediction[0], prediction[1], self._confusion_monitor, 2
-            )
-            for prediction in self.predictions
-        ]
-
-        # Populate the confusion matrix
-        print("Target screen regions:")
-        print(target_screen_regions)
-        print("Predict screen regions:")
-        print(predict_screen_regions)
-        for target, prediction in zip(target_screen_regions, predict_screen_regions):
-            target_idx = screen_regions.index(target)
-            prediction_idx = screen_regions.index(prediction)
-            confusion_matrix[target_idx, prediction_idx] += 1
-
-        # Calculate accuracy
-        total_predictions = np.sum(confusion_matrix)
-        correct_predictions = np.trace(confusion_matrix)
-        accuracy = (
-            correct_predictions / total_predictions if total_predictions > 0 else 0
-        )
-
-        return confusion_matrix, accuracy
-
     def report_results(self):
-        # Calculate RMSE
-        rmse = self._calculate_rmse()
-        confusion_matrix, accuracy = self._calculate_confusion_matrix()
+        report = score_accuracy_test(self.positions, self.predictions, self.monitor)
 
-        print("Performance monitoring complete!")
-        if rmse is not None:
-            print(f"RMSE: {rmse:.2f}")
-        else:
-            print("No RMSE calculated due to mismatched data.")
+        def px(v):
+            return "-" if v is None else f"{v:.0f}px"
 
-        # Calculate Confusion Matrix and Accuracy
-        print("Confusion Matrix:")
-        print(confusion_matrix)
-        print(f"Accuracy: {accuracy * 100:.2f}%")
+        print("Accuracy test complete!")
+        print(f"Dots: {report.samples}  no prediction (no face): {report.no_prediction}")
+        print(f"Error: median {px(report.median_error_px)}  RMSE {px(report.rmse_px)}")
+        if report.quadrant_accuracy is not None:
+            print(
+                f"Right quadrant: {report.quadrant_accuracy * 100:.1f}%  "
+                f"off the monitor: {report.off_monitor}"
+            )
+        print("Quadrant confusion (rows: target TL TR BL BR; columns: predicted TL TR BL BR off):")
+        for row in report.confusion:
+            print("  " + " ".join(f"{v:3d}" for v in row))

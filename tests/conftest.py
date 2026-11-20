@@ -56,6 +56,11 @@ class FakeWebcam:
     def get_camera_input(self):
         return self.frame
 
+    def get_camera_jpeg(self):
+        if self.frame is None:
+            return None
+        return cv2.imencode(".jpg", self.frame)[1].tobytes()
+
 
 class FakeVision:
     """Returns a fixed point of regard; ``None`` coordinates mean "no face"."""
